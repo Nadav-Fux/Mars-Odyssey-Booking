@@ -1,1 +1,603 @@
-{"path":"src/components/BookingOverlay.tsx","content":"import { useState, useCallback } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport {\n  X,\n  Rocket,\n  Users,\n  MapPin,\n  Calendar,\n  Sparkles,\n  ArrowRight,\n  ArrowLeft,\n  CreditCard,\n  Loader2,\n  CheckCircle,\n  ShieldCheck } from\n'lucide-react';\nimport SeatMap from '@/components/SeatMap';\nimport CabinCardDeck, { CABINS } from '@/components/CabinCardDeck';\nimport TrajectoryMap from '@/components/TrajectoryMap';\nimport LaunchSequence from '@/components/LaunchSequence';\nimport type { LaunchBooking } from '@/components/LaunchSequence';\nimport { EXPO_OUT } from '@/lib/easing';\n\nconst DESTS = ['Olympus Mons', 'Valles Marineris', 'Jezero Crater', 'Polar Ice Caps'];\nconst DATES = ['March 2026', 'June 2026', 'September 2026', 'January 2027'];\n\ninterface BookingOverlayProps {\n  isOpen: boolean;\n  onClose: () => void;\n  initialTier?: number;\n}\n\n// ── Pay button phases ──\ntype PayPhase = 'idle' | 'processing' | 'confirmed' | 'launching';\n\nexport default function BookingOverlay({ isOpen, onClose, initialTier = 1 }: BookingOverlayProps) {\n  const [step, setStep] = useState(0);\n  const [tier, setTier] = useState(initialTier);\n  const [seat, setSeat] = useState<string | null>(null);\n  const [form, setForm] = useState({ name: '', email: '', dest: '', date: '' });\n  const [payPhase, setPayPhase] = useState<PayPhase>('idle');\n  const [launching, setLaunching] = useState(false);\n\n  const reset = useCallback(() => {\n    setStep(0);\n    setSeat(null);\n    setForm({ name: '', email: '', dest: '', date: '' });\n    setPayPhase('idle');\n    setLaunching(false);\n  }, []);\n\n  const handleClose = useCallback(() => {\n    reset();\n    onClose();\n  }, [reset, onClose]);\n\n  // Pay button transformation sequence\n  const handlePay = useCallback(() => {\n    if (payPhase !== 'idle') return;\n    setPayPhase('processing');\n    setTimeout(() => setPayPhase('confirmed'), 1200);\n    setTimeout(() => {\n      setPayPhase('launching');\n      setLaunching(true);\n    }, 2200);\n  }, [payPhase]);\n\n  // After the full-screen rocket sequence finishes\n  const handleLaunchComplete = useCallback(() => {\n    setLaunching(false);\n    reset();\n    onClose();\n  }, [reset, onClose]);\n\n  const inputCls =\n  'w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/15 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/15 transition-all';\n  const selectCls =\n  'w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-primary/40 transition-all appearance-none cursor-pointer';\n\n  const STEPS = ['Class', 'Seat', 'Details', 'Checkout'];\n  const tierColor = CABINS[tier].color;\n\n  const launchBooking: LaunchBooking = {\n    cabin: CABINS[tier].name,\n    cabinColor: tierColor,\n    seat: seat || '—',\n    passenger: form.name || 'Traveler',\n    destination: form.dest || '—',\n    date: form.date || '—',\n    price: CABINS[tier].price\n  };\n\n  return (\n    <>\n      <AnimatePresence>\n        {isOpen && !launching &&\n        <motion.div\n          className=\"fixed inset-0 z-[100] flex items-center justify-center p-4\"\n          initial={{ opacity: 0 }}\n          animate={{ opacity: 1 }}\n          exit={{ opacity: 0 }}>\n\n            {/* Backdrop */}\n            <motion.div\n            className=\"absolute inset-0 bg-black/80 backdrop-blur-xl\"\n            onClick={handleClose}\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 1 }}\n            exit={{ opacity: 0 }} />\n\n\n            {/* Panel */}\n            <motion.div\n            layoutId=\"booking-panel\"\n            className=\"relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl\"\n            initial={{ scale: 0.85, y: 40 }}\n            animate={{ scale: 1, y: 0 }}\n            exit={{ scale: 0.85, y: 40 }}\n            transition={{ type: 'spring', damping: 28, stiffness: 280 }}>\n\n              {/* Glass bg */}\n              <div data-ev-id=\"ev_3cbe53fbe2\" className=\"absolute inset-0 bg-[#0a0a16]/95 backdrop-blur-3xl border border-white/[0.08] rounded-3xl\" />\n              <div data-ev-id=\"ev_a11aff4bc2\" className=\"absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-t-3xl\" />\n\n              <div data-ev-id=\"ev_3068a1c7e2\" className=\"relative p-5 sm:p-8\">\n                {/* Header */}\n                <div data-ev-id=\"ev_8be50d4108\" className=\"flex items-center justify-between mb-6\">\n                  <div data-ev-id=\"ev_bf71657c21\">\n                    <h3 data-ev-id=\"ev_063f5462ee\" className=\"font-display text-lg sm:text-xl font-bold text-white tracking-wide\">\n                      BOOK PASSAGE\n                    </h3>\n                    <p data-ev-id=\"ev_345619f3ce\" className=\"text-[10px] text-white/25 font-display tracking-[0.2em] mt-0.5\">\n                      ARES-X INTERPLANETARY\n                    </p>\n                  </div>\n                  <button data-ev-id=\"ev_632fa12afb\"\n                onClick={handleClose}\n                className=\"w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-all\">\n\n                    <X className=\"w-4 h-4\" />\n                  </button>\n                </div>\n\n                {/* Progress bar */}\n                <div data-ev-id=\"ev_e2f35e4a98\" className=\"flex items-center gap-1.5 mb-8\">\n                  {STEPS.map((label, i) =>\n                <div data-ev-id=\"ev_3d14ae993c\" key={label} className=\"flex items-center gap-1.5 flex-1\">\n                      <button data-ev-id=\"ev_fbab616f3e\"\n                  onClick={() => i < step && payPhase === 'idle' && setStep(i)}\n                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-display tracking-wider transition-all flex-shrink-0 ${\n                  i === step ?\n                  'bg-primary/10 border border-primary/25 text-primary' :\n                  i < step ?\n                  'bg-white/[0.04] border border-white/[0.06] text-white/40 cursor-pointer' :\n                  'bg-white/[0.02] border border-white/[0.04] text-white/15'}`\n                  }>\n\n                        <span data-ev-id=\"ev_5f773ffdba\" className=\"w-3.5 h-3.5 rounded flex items-center justify-center text-[8px] font-bold\">\n                          {i < step ? '✓' : i + 1}\n                        </span>\n                        <span data-ev-id=\"ev_b03a3ba4e6\" className=\"hidden sm:inline\">{label}</span>\n                      </button>\n                      {i < STEPS.length - 1 &&\n                  <div data-ev-id=\"ev_0cb5a82755\" className=\"flex-1 h-px bg-white/[0.04]\" />\n                  }\n                    </div>\n                )}\n                </div>\n\n                <AnimatePresence mode=\"wait\">\n                  {/* STEP 0 — Class */}\n                  {step === 0 && (\n                    <motion.div\n                      key=\"s0\"\n                      initial={{ opacity: 0, x: 30 }}\n                      animate={{ opacity: 1, x: 0 }}\n                      exit={{ opacity: 0, x: -30 }}\n                      transition={{ duration: 0.25, ease: EXPO_OUT }}>\n                      <CabinCardDeck\n                    compact\n                    initialIndex={tier}\n                    onSelect={(i) => {\n                      setTier(i);\n                      setStep(1);\n                    }} />\n                    </motion.div>\n                )}\n\n                  {/* STEP 1 — Seat */}\n                  {step === 1 && (\n                    <motion.div\n                      key=\"s1\"\n                      initial={{ opacity: 0, x: 30 }}\n                      animate={{ opacity: 1, x: 0 }}\n                      exit={{ opacity: 0, x: -30 }}\n                      transition={{ duration: 0.25, ease: EXPO_OUT }}>\n                      <div data-ev-id=\"ev_31465a2005\" className=\"text-center mb-4\">\n                        <span data-ev-id=\"ev_b2cf68c5ff\" className=\"text-[10px] font-display tracking-[0.2em] text-white/30\">\n                          SELECT YOUR SEAT &mdash;{' '}\n                        </span>\n                        <span data-ev-id=\"ev_06c34e2f4e\"\n                    className=\"text-[10px] font-display tracking-[0.2em] font-bold\"\n                    style={{ color: tierColor }}>\n\n                          {CABINS[tier].name.toUpperCase()} CLASS\n                        </span>\n                      </div>\n                      <SeatMap selectedTier={tier} selectedSeat={seat} onSelect={setSeat} />\n                      {seat &&\n                  <motion.div\n                    initial={{ opacity: 0, y: 10 }}\n                    animate={{ opacity: 1, y: 0 }}\n                    className=\"mt-4 text-center\">\n\n                          <span data-ev-id=\"ev_38e5b3a458\" className=\"text-xs text-white/40\">Selected: </span>\n                          <span data-ev-id=\"ev_be42fe3286\" className=\"font-display text-sm font-bold\" style={{ color: tierColor }}>\n                            SEAT {seat}\n                          </span>\n                        </motion.div>\n                  }\n                      <div data-ev-id=\"ev_1543c5788e\" className=\"flex gap-3 mt-6\">\n                        <button data-ev-id=\"ev_0dff4452a9\"\n                    onClick={() => setStep(0)}\n                    className=\"px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-xs hover:bg-white/[0.06] transition-all flex items-center gap-1.5\">\n\n                          <ArrowLeft className=\"w-3 h-3\" /> Back\n                        </button>\n                        <motion.button\n                      onClick={() => seat && setStep(2)}\n                      whileHover={{ scale: 1.02 }}\n                      whileTap={{ scale: 0.98 }}\n                      disabled={!seat}\n                      className={`flex-1 py-2.5 rounded-xl font-display text-xs font-semibold tracking-wider transition-all flex items-center justify-center gap-1.5 ${\n                      seat ?\n                      'bg-primary text-white shadow-lg shadow-primary/20' :\n                      'bg-white/[0.03] text-white/20 cursor-not-allowed'}`\n                      }>\n\n                          Continue <ArrowRight className=\"w-3 h-3\" />\n                        </motion.button>\n                      </div>\n                    </motion.div>\n                )}\n\n                  {/* STEP 2 — Details */}\n                  {step === 2 && (\n                    <motion.div\n                      key=\"s2\"\n                      initial={{ opacity: 0, x: 30 }}\n                      animate={{ opacity: 1, x: 0 }}\n                      exit={{ opacity: 0, x: -30 }}\n                      transition={{ duration: 0.25, ease: EXPO_OUT }}>\n                      <div data-ev-id=\"ev_5695c451fc\" className=\"space-y-4\">\n                        <div data-ev-id=\"ev_d05709f5f6\">\n                          <label data-ev-id=\"ev_d294853796\" className=\"block text-[9px] text-white/25 font-display tracking-[0.2em] uppercase mb-1.5\">\n                            Full Name\n                          </label>\n                          <div data-ev-id=\"ev_f8e1a9a996\" className=\"relative\">\n                            <Users className=\"absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15\" />\n                            <input data-ev-id=\"ev_55ace9fc41\"\n                        type=\"text\"\n                        value={form.name}\n                        onChange={(e) => setForm({ ...form, name: e.target.value })}\n                        placeholder=\"Commander...\"\n                        className={inputCls} />\n\n                          </div>\n                        </div>\n                        <div data-ev-id=\"ev_74f0c1c7d4\">\n                          <label data-ev-id=\"ev_c3f77b790c\" className=\"block text-[9px] text-white/25 font-display tracking-[0.2em] uppercase mb-1.5\">\n                            Email\n                          </label>\n                          <div data-ev-id=\"ev_e5990ca4f7\" className=\"relative\">\n                            <Sparkles className=\"absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15\" />\n                            <input data-ev-id=\"ev_e3a69e8937\"\n                        type=\"email\"\n                        value={form.email}\n                        onChange={(e) => setForm({ ...form, email: e.target.value })}\n                        placeholder=\"you@earth.com\"\n                        className={inputCls} />\n\n                          </div>\n                        </div>\n                        <div data-ev-id=\"ev_c119a62aa9\" className=\"grid grid-cols-2 gap-3\">\n                          <div data-ev-id=\"ev_4950e310e9\">\n                            <label data-ev-id=\"ev_b429d79810\" className=\"block text-[9px] text-white/25 font-display tracking-[0.2em] uppercase mb-1.5\">\n                              Destination\n                            </label>\n                            <div data-ev-id=\"ev_914381c60b\" className=\"relative\">\n                              <MapPin className=\"absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15\" />\n                              <select data-ev-id=\"ev_ffd48c865a\"\n                          value={form.dest}\n                          onChange={(e) => setForm({ ...form, dest: e.target.value })}\n                          className={selectCls}>\n\n                                <option data-ev-id=\"ev_8e808e5149\" value=\"\" className=\"bg-[#0a0a14]\">\n                                  Select...\n                                </option>\n                                {DESTS.map((d) =>\n                            <option data-ev-id=\"ev_e62c8b0463\" key={d} value={d} className=\"bg-[#0a0a14]\">\n                                    {d}\n                                  </option>\n                            )}\n                              </select>\n                            </div>\n                          </div>\n                          <div data-ev-id=\"ev_d3f34a3864\">\n                            <label data-ev-id=\"ev_f775fa1a78\" className=\"block text-[9px] text-white/25 font-display tracking-[0.2em] uppercase mb-1.5\">\n                              Launch\n                            </label>\n                            <div data-ev-id=\"ev_2c6b1e7c5c\" className=\"relative\">\n                              <Calendar className=\"absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15\" />\n                              <select data-ev-id=\"ev_053ccd5278\"\n                          value={form.date}\n                          onChange={(e) => setForm({ ...form, date: e.target.value })}\n                          className={selectCls}>\n\n                                <option data-ev-id=\"ev_83f47f0fba\" value=\"\" className=\"bg-[#0a0a14]\">\n                                  Select...\n                                </option>\n                                {DATES.map((d) =>\n                            <option data-ev-id=\"ev_6a41b0f329\" key={d} value={d} className=\"bg-[#0a0a14]\">\n                                    {d}\n                                  </option>\n                            )}\n                              </select>\n                            </div>\n                          </div>\n                        </div>\n                      </div>\n\n                      {/* Trajectory map */}\n                      <AnimatePresence mode=\"wait\">\n                        {form.date && <TrajectoryMap key={form.date} selectedDate={form.date} />}\n                      </AnimatePresence>\n\n                      <div data-ev-id=\"ev_85a37ee76e\" className=\"flex gap-3 mt-6\">\n                        <button data-ev-id=\"ev_75a918dab2\"\n                    onClick={() => setStep(1)}\n                    className=\"px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-xs hover:bg-white/[0.06] transition-all flex items-center gap-1.5\">\n\n                          <ArrowLeft className=\"w-3 h-3\" /> Back\n                        </button>\n                        <motion.button\n                      onClick={() => setStep(3)}\n                      whileHover={{ scale: 1.02 }}\n                      whileTap={{ scale: 0.98 }}\n                      className=\"flex-1 py-2.5 rounded-xl bg-primary text-white font-display text-xs font-semibold tracking-wider shadow-lg shadow-primary/20 flex items-center justify-center gap-1.5\">\n\n                          Review &amp; Pay <ArrowRight className=\"w-3 h-3\" />\n                        </motion.button>\n                      </div>\n                    </motion.div>\n                )}\n\n                  {/* STEP 3 — Checkout */}\n                  {step === 3 && (\n                    <motion.div\n                      key=\"s3\"\n                      initial={{ opacity: 0, x: 30 }}\n                      animate={{ opacity: 1, x: 0 }}\n                      exit={{ opacity: 0, x: -30 }}\n                      transition={{ duration: 0.25, ease: EXPO_OUT }}>\n                      {/* Order summary */}\n                      <div data-ev-id=\"ev_875d00356a\" className=\"space-y-2 mb-5\">\n                        {[\n                    { k: 'Class', v: CABINS[tier].name, c: tierColor },\n                    { k: 'Seat', v: seat || '—', c: tierColor },\n                    { k: 'Passenger', v: form.name || '—' },\n                    { k: 'Destination', v: form.dest || '—' },\n                    { k: 'Launch', v: form.date || '—' }].\n                    map((r) =>\n                    <div data-ev-id=\"ev_b7b08e876b\"\n                    key={r.k}\n                    className=\"flex justify-between py-1.5 border-b border-white/[0.04]\">\n\n                            <span data-ev-id=\"ev_58a89e2d42\" className=\"text-white/25 text-xs\">{r.k}</span>\n                            <span data-ev-id=\"ev_862ce01723\"\n                      className=\"text-xs font-medium\"\n                      style={{ color: r.c || 'rgba(255,255,255,0.6)' }}>\n\n                              {r.v}\n                            </span>\n                          </div>\n                    )}\n                      </div>\n\n                      {/* Payment card */}\n                      <div data-ev-id=\"ev_e43faf17e9\" className=\"rounded-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.07] p-4 mb-5\">\n                        <div data-ev-id=\"ev_d73aecc565\" className=\"flex items-center justify-between mb-3\">\n                          <div data-ev-id=\"ev_10cdfe56d6\" className=\"flex items-center gap-2\">\n                            <CreditCard className=\"w-4 h-4 text-white/25\" />\n                            <span data-ev-id=\"ev_29f9bc80ff\" className=\"text-[9px] font-display tracking-[0.18em] text-white/30\">\n                              PAYMENT METHOD\n                            </span>\n                          </div>\n                          <ShieldCheck className=\"w-3.5 h-3.5 text-green-500/40\" />\n                        </div>\n\n                        <div data-ev-id=\"ev_263729e10b\" className=\"flex items-center gap-3\">\n                          {/* Card chip */}\n                          <div data-ev-id=\"ev_81fee13e8e\" className=\"w-8 h-6 rounded bg-gradient-to-br from-yellow-500/30 to-yellow-600/20 border border-yellow-500/20\" />\n                          <div data-ev-id=\"ev_203ea7ea7b\">\n                            <p data-ev-id=\"ev_8e73db4507\" className=\"text-white/50 text-xs font-mono tracking-wider\">\n                              •••• •••• •••• 4242\n                            </p>\n                            <p data-ev-id=\"ev_51bc44cc57\" className=\"text-[9px] text-white/20 font-display tracking-wider mt-0.5\">\n                              ARES-X CARD &middot; EXP 12/28\n                            </p>\n                          </div>\n                        </div>\n                      </div>\n\n                      {/* Total */}\n                      <div data-ev-id=\"ev_3e942dce49\" className=\"flex items-baseline justify-between mb-6\">\n                        <span data-ev-id=\"ev_b9d970d39e\" className=\"text-[10px] font-display tracking-[0.15em] text-white/30\">\n                          TOTAL\n                        </span>\n                        <div data-ev-id=\"ev_955890773e\">\n                          <span data-ev-id=\"ev_129b9596a1\"\n                      className=\"font-display text-2xl font-bold\"\n                      style={{ color: tierColor }}>\n\n                            ${CABINS[tier].price}\n                          </span>\n                          <span data-ev-id=\"ev_50badd94ec\" className=\"text-white/15 text-[10px] ml-1\">/person</span>\n                        </div>\n                      </div>\n\n                      {/* Buttons */}\n                      <div data-ev-id=\"ev_f4e3420a76\" className=\"flex gap-3\">\n                        {/* Back (hidden once pay starts) */}\n                        <AnimatePresence>\n                          {payPhase === 'idle' && (\n                      <motion.button\n                        exit={{ width: 0, opacity: 0, paddingLeft: 0, paddingRight: 0, marginRight: 0 }}\n                        transition={{ duration: 0.3, ease: EXPO_OUT }}\n                        onClick={() => {setStep(2);setPayPhase('idle');}}\n                        className=\"px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-xs hover:bg-white/[0.06] transition-all flex items-center gap-1.5 overflow-hidden\">\n\n                              <ArrowLeft className=\"w-3 h-3 flex-shrink-0\" />\n                              <span data-ev-id=\"ev_8b984caf52\" className=\"flex-shrink-0\">Back</span>\n                            </motion.button>\n                      )\n                      }\n                        </AnimatePresence>\n\n                        {/* Pay / Launch button */}\n                        <motion.button\n                      onClick={handlePay}\n                      disabled={payPhase !== 'idle'}\n                      layout\n                      className={`flex-1 py-3 rounded-xl font-display text-sm font-semibold tracking-wider flex items-center justify-center gap-2 transition-shadow overflow-hidden ${\n                      payPhase === 'confirmed' ?\n                      'bg-green-500 text-white shadow-lg shadow-green-500/25' :\n                      payPhase === 'processing' ?\n                      'bg-white/[0.06] border border-white/[0.1] text-white/50' :\n                      'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/25 cursor-pointer'}`\n                      }\n                      animate={{\n                        boxShadow:\n                        payPhase === 'processing' ?\n                        [\n                        '0 0 0px rgba(255,69,0,0)',\n                        '0 0 30px rgba(255,69,0,0.15)',\n                        '0 0 0px rgba(255,69,0,0)'] :\n\n                        undefined\n                      }}\n                      transition={{\n                        boxShadow: { duration: 1.2, repeat: Infinity },\n                        layout: { type: 'spring', stiffness: 300, damping: 25 }\n                      }}\n                      whileHover={payPhase === 'idle' ? { scale: 1.02 } : undefined}\n                      whileTap={payPhase === 'idle' ? { scale: 0.98 } : undefined}>\n\n                          <AnimatePresence mode=\"wait\">\n                            {payPhase === 'idle' && (\n                              <motion.span\n                                key=\"idle\"\n                                className=\"flex items-center gap-2\"\n                                initial={{ opacity: 0, y: 10 }}\n                                animate={{ opacity: 1, y: 0 }}\n                                exit={{ opacity: 0, y: -10 }}\n                                transition={{ duration: 0.2, ease: EXPO_OUT }}\n                              >\n                                <Rocket className=\"w-4 h-4\" />\n                                PAY ${CABINS[tier].price}\n                              </motion.span>\n                            )}\n\n                            {payPhase === 'processing' && (\n                              <motion.span\n                                key=\"proc\"\n                                className=\"flex items-center gap-2\"\n                                initial={{ opacity: 0, y: 10 }}\n                                animate={{ opacity: 1, y: 0 }}\n                                exit={{ opacity: 0, y: -10 }}\n                                transition={{ duration: 0.2, ease: EXPO_OUT }}\n                              >\n                                <Loader2 className=\"w-4 h-4 animate-spin\" />\n                                PROCESSING…\n                              </motion.span>\n                            )}\n\n                            {(payPhase === 'confirmed' || payPhase === 'launching') && (\n                              <motion.span\n                                key=\"conf\"\n                                className=\"flex items-center gap-2\"\n                                initial={{ opacity: 0, scale: 0.8 }}\n                                animate={{ opacity: 1, scale: 1 }}\n                                exit={{ opacity: 0, scale: 1.1 }}\n                                transition={{ type: 'spring', stiffness: 400, damping: 15 }}\n                              >\n                                <CheckCircle className=\"w-4 h-4\" />\n                                CONFIRMED\n                              </motion.span>\n                            )}\n                          </AnimatePresence>\n                        </motion.button>\n                      </div>\n\n                      {/* Fine print */}\n                      <p data-ev-id=\"ev_af9bddf731\" className=\"text-[9px] text-white/10 text-center mt-4 font-display tracking-wider\">\n                        ENCRYPTED &middot; FULLY REFUNDABLE T-30 &middot; ARES-X SECURE PAY\n                      </p>\n                    </motion.div>\n                )}\n                </AnimatePresence>\n              </div>\n            </motion.div>\n          </motion.div>\n        }\n      </AnimatePresence>\n\n      {/* ── Full-screen rocket launch ── */}\n      <LaunchSequence\n        active={launching}\n        onComplete={handleLaunchComplete}\n        booking={launchBooking} />\n\n    </>);\n\n}","encoding":"utf8"}
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  X,
+  Rocket,
+  Users,
+  MapPin,
+  Calendar,
+  Sparkles,
+  ArrowRight,
+  ArrowLeft,
+  CreditCard,
+  Loader2,
+  CheckCircle,
+  ShieldCheck } from
+'lucide-react';
+import SeatMap from '@/components/SeatMap';
+import CabinCardDeck, { CABINS } from '@/components/CabinCardDeck';
+import TrajectoryMap from '@/components/TrajectoryMap';
+import LaunchSequence from '@/components/LaunchSequence';
+import type { LaunchBooking } from '@/components/LaunchSequence';
+import { EXPO_OUT } from '@/lib/easing';
+
+const DESTS = ['Olympus Mons', 'Valles Marineris', 'Jezero Crater', 'Polar Ice Caps'];
+const DATES = ['March 2026', 'June 2026', 'September 2026', 'January 2027'];
+
+interface BookingOverlayProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialTier?: number;
+}
+
+// ── Pay button phases ──
+type PayPhase = 'idle' | 'processing' | 'confirmed' | 'launching';
+
+export default function BookingOverlay({ isOpen, onClose, initialTier = 1 }: BookingOverlayProps) {
+  const [step, setStep] = useState(0);
+  const [tier, setTier] = useState(initialTier);
+  const [seat, setSeat] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', dest: '', date: '' });
+  const [payPhase, setPayPhase] = useState<PayPhase>('idle');
+  const [launching, setLaunching] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; dest?: string; date?: string }>({});
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap for accessibility
+  useEffect(() => {
+    if (!isOpen || launching) return;
+    const element = containerRef.current;
+    if (!element) return;
+
+    const focusableElements = element.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstEl = focusableElements[0] as HTMLElement;
+    const lastEl = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (e.shiftKey) {
+        if (document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl?.focus();
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl?.focus();
+        }
+      }
+    };
+
+    element.addEventListener('keydown', handleKeyDown);
+    firstEl?.focus();
+    return () => element.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, launching, step]);
+
+  // Form validation
+  const validateForm = useCallback((): boolean => {
+    const newErrors: typeof errors = {};
+    if (!form.name.trim()) newErrors.name = 'Full name is required';
+    if (!form.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    if (!form.dest) newErrors.dest = 'Please select a destination';
+    if (!form.date) newErrors.date = 'Please select a launch date';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [form]);
+
+  const reset = useCallback(() => {
+    setStep(0);
+    setSeat(null);
+    setForm({ name: '', email: '', dest: '', date: '' });
+    setPayPhase('idle');
+    setLaunching(false);
+    setErrors({});
+  }, []);
+
+  const handleClose = useCallback(() => {
+    reset();
+    onClose();
+  }, [reset, onClose]);
+
+  // Pay button transformation sequence
+  const handlePay = useCallback(() => {
+    if (payPhase !== 'idle') return;
+    setPayPhase('processing');
+    setTimeout(() => setPayPhase('confirmed'), 1200);
+    setTimeout(() => {
+      setPayPhase('launching');
+      setLaunching(true);
+    }, 2200);
+  }, [payPhase]);
+
+  // After the full-screen rocket sequence finishes
+  const handleLaunchComplete = useCallback(() => {
+    setLaunching(false);
+    reset();
+    onClose();
+  }, [reset, onClose]);
+
+  const inputCls =
+  'w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/15 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/15 transition-all';
+  const inputErrorCls =
+  'w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.04] border border-red-500/40 text-white text-sm placeholder:text-white/15 focus:outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/15 transition-all';
+  const selectCls =
+  'w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm focus:outline-none focus:border-primary/40 transition-all appearance-none cursor-pointer';
+  const selectErrorCls =
+  'w-full pl-10 pr-4 py-3 rounded-xl bg-white/[0.04] border border-red-500/40 text-white text-sm focus:outline-none focus:border-red-500/60 transition-all appearance-none cursor-pointer';
+
+  const STEPS = ['Class', 'Seat', 'Details', 'Checkout'];
+  const tierColor = CABINS[tier].color;
+
+  const launchBooking: LaunchBooking = {
+    cabin: CABINS[tier].name,
+    cabinColor: tierColor,
+    seat: seat || '\u2014',
+    passenger: form.name || 'Traveler',
+    destination: form.dest || '\u2014',
+    date: form.date || '\u2014',
+    price: CABINS[tier].price
+  };
+
+  return (
+    <>
+      <AnimatePresence>
+        {isOpen && !launching &&
+        <motion.div
+          ref={containerRef}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}>
+
+            {/* Backdrop */}
+            <motion.div
+            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            onClick={handleClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }} />
+
+
+            {/* Panel */}
+            <motion.div
+            layoutId="booking-panel"
+            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl"
+            initial={{ scale: 0.85, y: 40 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.85, y: 40 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 280 }}>
+
+              {/* Glass bg */}
+              <div className="absolute inset-0 bg-[#0a0a16]/95 backdrop-blur-3xl border border-white/[0.08] rounded-3xl" />
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent rounded-t-3xl" />
+
+              <div className="relative p-5 sm:p-8">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-display text-lg sm:text-xl font-bold text-white tracking-wide">
+                      BOOK PASSAGE
+                    </h3>
+                    <p className="text-[10px] text-white/50 font-display tracking-[0.2em] mt-0.5">
+                      ARES-X INTERPLANETARY
+                    </p>
+                  </div>
+                  <button
+                onClick={handleClose}
+                className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-all">
+
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Progress bar */}
+                <div className="flex items-center gap-1.5 mb-8">
+                  {STEPS.map((label, i) =>
+                <div key={label} className="flex items-center gap-1.5 flex-1">
+                      <button
+                  onClick={() => i < step && payPhase === 'idle' && setStep(i)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-display tracking-wider transition-all flex-shrink-0 ${
+                  i === step ?
+                  'bg-primary/10 border border-primary/25 text-primary' :
+                  i < step ?
+                  'bg-white/[0.04] border border-white/[0.06] text-white/40 cursor-pointer' :
+                  'bg-white/[0.02] border border-white/[0.04] text-white/50'}`
+                  }>
+
+                        <span className="w-3.5 h-3.5 rounded flex items-center justify-center text-[8px] font-bold">
+                          {i < step ? '\u2713' : i + 1}
+                        </span>
+                        <span className="hidden sm:inline">{label}</span>
+                      </button>
+                      {i < STEPS.length - 1 &&
+                  <div className="flex-1 h-px bg-white/[0.04]" />
+                  }
+                    </div>
+                )}
+                </div>
+
+                <AnimatePresence mode="wait">
+                  {/* STEP 0 — Class */}
+                  {step === 0 && (
+                    <motion.div
+                      key="s0"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.25, ease: EXPO_OUT }}>
+                      <CabinCardDeck
+                    compact
+                    initialIndex={tier}
+                    onSelect={(i) => {
+                      setTier(i);
+                      setStep(1);
+                    }} />
+                    </motion.div>
+                )}
+
+                  {/* STEP 1 — Seat */}
+                  {step === 1 && (
+                    <motion.div
+                      key="s1"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.25, ease: EXPO_OUT }}>
+                      <div className="text-center mb-4">
+                        <span className="text-[10px] font-display tracking-[0.2em] text-white/30">
+                          SELECT YOUR SEAT &mdash;{' '}
+                        </span>
+                        <span
+                    className="text-[10px] font-display tracking-[0.2em] font-bold"
+                    style={{ color: tierColor }}>
+
+                          {CABINS[tier].name.toUpperCase()} CLASS
+                        </span>
+                      </div>
+                      <SeatMap selectedTier={tier} selectedSeat={seat} onSelect={setSeat} />
+                      {seat &&
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 text-center">
+
+                          <span className="text-xs text-white/40">Selected: </span>
+                          <span className="font-display text-sm font-bold" style={{ color: tierColor }}>
+                            SEAT {seat}
+                          </span>
+                        </motion.div>
+                  }
+                      <div className="flex gap-3 mt-6">
+                        <button
+                    onClick={() => setStep(0)}
+                    className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-xs hover:bg-white/[0.06] transition-all flex items-center gap-1.5">
+
+                          <ArrowLeft className="w-3 h-3" /> Back
+                        </button>
+                        <motion.button
+                      onClick={() => seat && setStep(2)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      disabled={!seat}
+                      className={`flex-1 py-2.5 rounded-xl font-display text-xs font-semibold tracking-wider transition-all flex items-center justify-center gap-1.5 ${
+                      seat ?
+                      'bg-primary text-white shadow-lg shadow-primary/20' :
+                      'bg-white/[0.03] text-white/50 cursor-not-allowed'}`
+                      }>
+
+                          Continue <ArrowRight className="w-3 h-3" />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                )}
+
+                  {/* STEP 2 — Details */}
+                  {step === 2 && (
+                    <motion.div
+                      key="s2"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.25, ease: EXPO_OUT }}>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[9px] text-white/50 font-display tracking-[0.2em] uppercase mb-1.5">
+                            Full Name
+                          </label>
+                          <div className="relative">
+                            <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
+                            <input
+                        type="text"
+                        value={form.name}
+                        onChange={(e) => { setForm({ ...form, name: e.target.value }); if (errors.name) setErrors((prev) => ({ ...prev, name: undefined })); }}
+                        placeholder="Commander..."
+                        className={errors.name ? inputErrorCls : inputCls} />
+
+                          </div>
+                          {errors.name && <p className="text-red-400 text-[10px] mt-1">{errors.name}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-white/50 font-display tracking-[0.2em] uppercase mb-1.5">
+                            Email
+                          </label>
+                          <div className="relative">
+                            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
+                            <input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => { setForm({ ...form, email: e.target.value }); if (errors.email) setErrors((prev) => ({ ...prev, email: undefined })); }}
+                        placeholder="you@earth.com"
+                        className={errors.email ? inputErrorCls : inputCls} />
+
+                          </div>
+                          {errors.email && <p className="text-red-400 text-[10px] mt-1">{errors.email}</p>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[9px] text-white/50 font-display tracking-[0.2em] uppercase mb-1.5">
+                              Destination
+                            </label>
+                            <div className="relative">
+                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
+                              <select
+                          value={form.dest}
+                          onChange={(e) => { setForm({ ...form, dest: e.target.value }); if (errors.dest) setErrors((prev) => ({ ...prev, dest: undefined })); }}
+                          className={errors.dest ? selectErrorCls : selectCls}>
+
+                                <option value="" className="bg-[#0a0a14]">
+                                  Select...
+                                </option>
+                                {DESTS.map((d) =>
+                            <option key={d} value={d} className="bg-[#0a0a14]">
+                                    {d}
+                                  </option>
+                            )}
+                              </select>
+                            </div>
+                            {errors.dest && <p className="text-red-400 text-[10px] mt-1">{errors.dest}</p>}
+                          </div>
+                          <div>
+                            <label className="block text-[9px] text-white/50 font-display tracking-[0.2em] uppercase mb-1.5">
+                              Launch
+                            </label>
+                            <div className="relative">
+                              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/15" />
+                              <select
+                          value={form.date}
+                          onChange={(e) => { setForm({ ...form, date: e.target.value }); if (errors.date) setErrors((prev) => ({ ...prev, date: undefined })); }}
+                          className={errors.date ? selectErrorCls : selectCls}>
+
+                                <option value="" className="bg-[#0a0a14]">
+                                  Select...
+                                </option>
+                                {DATES.map((d) =>
+                            <option key={d} value={d} className="bg-[#0a0a14]">
+                                    {d}
+                                  </option>
+                            )}
+                              </select>
+                            </div>
+                            {errors.date && <p className="text-red-400 text-[10px] mt-1">{errors.date}</p>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Trajectory map */}
+                      <AnimatePresence mode="wait">
+                        {form.date && <TrajectoryMap key={form.date} selectedDate={form.date} />}
+                      </AnimatePresence>
+
+                      <div className="flex gap-3 mt-6">
+                        <button
+                    onClick={() => setStep(1)}
+                    className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-xs hover:bg-white/[0.06] transition-all flex items-center gap-1.5">
+
+                          <ArrowLeft className="w-3 h-3" /> Back
+                        </button>
+                        <motion.button
+                      onClick={() => { if (validateForm()) setStep(3); }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex-1 py-2.5 rounded-xl bg-primary text-white font-display text-xs font-semibold tracking-wider shadow-lg shadow-primary/20 flex items-center justify-center gap-1.5">
+
+                          Review &amp; Pay <ArrowRight className="w-3 h-3" />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                )}
+
+                  {/* STEP 3 — Checkout */}
+                  {step === 3 && (
+                    <motion.div
+                      key="s3"
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 0.25, ease: EXPO_OUT }}>
+                      {/* Order summary */}
+                      <div className="space-y-2 mb-5">
+                        {[
+                    { k: 'Class', v: CABINS[tier].name, c: tierColor },
+                    { k: 'Seat', v: seat || '\u2014', c: tierColor },
+                    { k: 'Passenger', v: form.name || '\u2014' },
+                    { k: 'Destination', v: form.dest || '\u2014' },
+                    { k: 'Launch', v: form.date || '\u2014' }].
+                    map((r) =>
+                    <div
+                    key={r.k}
+                    className="flex justify-between py-1.5 border-b border-white/[0.04]">
+
+                            <span className="text-white/50 text-xs">{r.k}</span>
+                            <span
+                      className="text-xs font-medium"
+                      style={{ color: r.c || 'rgba(255,255,255,0.6)' }}>
+
+                              {r.v}
+                            </span>
+                          </div>
+                    )}
+                      </div>
+
+                      {/* Payment card */}
+                      <div className="rounded-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.07] p-4 mb-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-white/50" />
+                            <span className="text-[9px] font-display tracking-[0.18em] text-white/30">
+                              PAYMENT METHOD
+                            </span>
+                          </div>
+                          <ShieldCheck className="w-3.5 h-3.5 text-green-500/40" />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Card chip */}
+                          <div className="w-8 h-6 rounded bg-gradient-to-br from-yellow-500/30 to-yellow-600/20 border border-yellow-500/20" />
+                          <div>
+                            <p className="text-white/50 text-xs font-mono tracking-wider">
+                              &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; 4242
+                            </p>
+                            <p className="text-[9px] text-white/50 font-display tracking-wider mt-0.5">
+                              ARES-X CARD &middot; EXP 12/28
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Total */}
+                      <div className="flex items-baseline justify-between mb-6">
+                        <span className="text-[10px] font-display tracking-[0.15em] text-white/30">
+                          TOTAL
+                        </span>
+                        <div>
+                          <span
+                      className="font-display text-2xl font-bold"
+                      style={{ color: tierColor }}>
+
+                            ${CABINS[tier].price}
+                          </span>
+                          <span className="text-white/50 text-[10px] ml-1">/person</span>
+                        </div>
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex gap-3">
+                        {/* Back (hidden once pay starts) */}
+                        <AnimatePresence>
+                          {payPhase === 'idle' && (
+                      <motion.button
+                        exit={{ width: 0, opacity: 0, paddingLeft: 0, paddingRight: 0, marginRight: 0 }}
+                        transition={{ duration: 0.3, ease: EXPO_OUT }}
+                        onClick={() => {setStep(2);setPayPhase('idle');}}
+                        className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/40 text-xs hover:bg-white/[0.06] transition-all flex items-center gap-1.5 overflow-hidden">
+
+                              <ArrowLeft className="w-3 h-3 flex-shrink-0" />
+                              <span className="flex-shrink-0">Back</span>
+                            </motion.button>
+                      )
+                      }
+                        </AnimatePresence>
+
+                        {/* Pay / Launch button */}
+                        <motion.button
+                      onClick={handlePay}
+                      disabled={payPhase !== 'idle'}
+                      layout
+                      className={`flex-1 py-3 rounded-xl font-display text-sm font-semibold tracking-wider flex items-center justify-center gap-2 transition-shadow overflow-hidden ${
+                      payPhase === 'confirmed' ?
+                      'bg-green-500 text-white shadow-lg shadow-green-500/25' :
+                      payPhase === 'processing' ?
+                      'bg-white/[0.06] border border-white/[0.1] text-white/50' :
+                      'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/25 cursor-pointer'}`
+                      }
+                      animate={{
+                        boxShadow:
+                        payPhase === 'processing' ?
+                        [
+                        '0 0 0px rgba(255,69,0,0)',
+                        '0 0 30px rgba(255,69,0,0.15)',
+                        '0 0 0px rgba(255,69,0,0)'] :
+
+                        undefined
+                      }}
+                      transition={{
+                        boxShadow: { duration: 1.2, repeat: Infinity },
+                        layout: { type: 'spring', stiffness: 300, damping: 25 }
+                      }}
+                      whileHover={payPhase === 'idle' ? { scale: 1.02 } : undefined}
+                      whileTap={payPhase === 'idle' ? { scale: 0.98 } : undefined}>
+
+                          <AnimatePresence mode="wait">
+                            {payPhase === 'idle' && (
+                              <motion.span
+                                key="idle"
+                                className="flex items-center gap-2"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2, ease: EXPO_OUT }}
+                              >
+                                <Rocket className="w-4 h-4" />
+                                PAY ${CABINS[tier].price}
+                              </motion.span>
+                            )}
+
+                            {payPhase === 'processing' && (
+                              <motion.span
+                                key="proc"
+                                className="flex items-center gap-2"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2, ease: EXPO_OUT }}
+                              >
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                PROCESSING\u2026
+                              </motion.span>
+                            )}
+
+                            {(payPhase === 'confirmed' || payPhase === 'launching') && (
+                              <motion.span
+                                key="conf"
+                                className="flex items-center gap-2"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 1.1 }}
+                                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                CONFIRMED
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
+                        </motion.button>
+                      </div>
+
+                      {/* Fine print */}
+                      <p className="text-[9px] text-white/10 text-center mt-4 font-display tracking-wider">
+                        ENCRYPTED &middot; FULLY REFUNDABLE T-30 &middot; ARES-X SECURE PAY
+                      </p>
+                    </motion.div>
+                )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          </motion.div>
+        }
+      </AnimatePresence>
+
+      {/* \u2500\u2500 Full-screen rocket launch \u2500\u2500 */}
+      <LaunchSequence
+        active={launching}
+        onComplete={handleLaunchComplete}
+        booking={launchBooking} />
+
+    </>);
+
+}
