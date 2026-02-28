@@ -1,1 +1,268 @@
-{"path":"src/components/StarField.tsx","content":"import { useEffect, useRef, memo } from 'react';\n\ninterface Star {\n  x: number;\n  y: number;\n  size: number;\n  alpha: number;\n  speed: number;\n  pulse: number;\n  layer: number;\n  coreColor: string;\n  glowColor: string;\n}\n\n// Scroll parallax per layer\nconst LAYER_SCROLL_PARALLAX = [0.02, 0.06, 0.14];\n// Mouse parallax per layer\nconst LAYER_MOUSE_PARALLAX = [8, 28, 60];\nconst LAYER_SIZE = [0.6, 1.0, 1.8];\nconst LAYER_ALPHA = [0.25, 0.45, 0.7];\nconst MOUSE_LERP = 0.06;\n\n// Check if battery-saver mode is active\nconst isSaving = () => document.documentElement.classList.contains('battery-saver');\n\nfunction StarField() {\n  const canvasRef = useRef<HTMLCanvasElement>(null);\n  const frameRef = useRef(0);\n  const starsRef = useRef<Star[]>([]);\n  const shootingRef = useRef<{ x: number; y: number; vx: number; vy: number; life: number }[]>([]);\n  const lastShootRef = useRef(0);\n  const scrollRef = useRef(0);\n  const viewH = useRef(0);\n  const mouseTarget = useRef({ x: 0, y: 0 });\n  const mouseCurrent = useRef({ x: 0, y: 0 });\n  // Frame-skip for battery saver: draw every Nth frame\n  const frameCount = useRef(0);\n\n  useEffect(() => {\n    const canvas = canvasRef.current;\n    if (!canvas) return;\n    const ctx = canvas.getContext('2d', { alpha: true })!;\n\n    const resize = () => {\n      // Cap DPR at 1 on mobile for massive perf gain\n      const isMobile = window.innerWidth < 768;\n      const dpr = isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5);\n      const w = window.innerWidth;\n      // Only size canvas to viewport, not full scroll height\n      const h = window.innerHeight;\n      canvas.width = w * dpr;\n      canvas.height = h * dpr;\n      canvas.style.width = `${w}px`;\n      canvas.style.height = `${h}px`;\n      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);\n      viewH.current = h;\n      initStars(w, h);\n    };\n\n    const initStars = (w: number, h: number) => {\n      const isMobile = w < 768;\n      // Significantly reduced counts\n      const maxCount = isMobile ? 100 : 250;\n      const count = Math.min(Math.floor((w * h) / 6000), maxCount);\n\n      starsRef.current = Array.from({ length: count }, () => {\n        const layer = Math.random() < 0.4 ? 0 : Math.random() < 0.65 ? 1 : 2;\n        const hue = Math.random() > 0.88 ? 15 + Math.random() * 20 : 220 + Math.random() * 30;\n        return {\n          x: Math.random() * w,\n          y: Math.random() * h * 3, // spread across scrollable area\n          size: (Math.random() * 1.5 + 0.3) * LAYER_SIZE[layer],\n          alpha: (Math.random() * 0.4 + 0.15) * LAYER_ALPHA[layer],\n          speed: (Math.random() * 0.15 + 0.02) * (layer + 1),\n          pulse: Math.random() * 0.004 + 0.001,\n          layer,\n          coreColor: `hsla(${hue | 0}, 40%, 92%, `,\n          glowColor: `hsla(${hue | 0}, 60%, 85%, `,\n        };\n      });\n    };\n\n    /* Scroll tracking */\n    let scrollTicking = false;\n    const onScroll = () => {\n      if (!scrollTicking) {\n        scrollTicking = true;\n        requestAnimationFrame(() => {\n          scrollRef.current = window.scrollY;\n          scrollTicking = false;\n        });\n      }\n    };\n    window.addEventListener('scroll', onScroll, { passive: true });\n\n    /* Mouse tracking */\n    const onMouseMove = (e: MouseEvent) => {\n      const cx = window.innerWidth / 2;\n      const cy = window.innerHeight / 2;\n      mouseTarget.current.x = (e.clientX - cx) / cx;\n      mouseTarget.current.y = (e.clientY - cy) / cy;\n    };\n    window.addEventListener('mousemove', onMouseMove, { passive: true });\n\n    const onMouseLeave = () => {\n      mouseTarget.current.x = 0;\n      mouseTarget.current.y = 0;\n    };\n    document.addEventListener('mouseleave', onMouseLeave);\n\n    resize();\n    window.addEventListener('resize', resize);\n\n    const w = () => window.innerWidth;\n    const vh = () => viewH.current;\n\n    /* Draw loop */\n    const draw = (t: number) => {\n      frameCount.current++;\n\n      // In battery-saver mode, only draw every 3rd frame (~20fps)\n      if (isSaving() && frameCount.current % 3 !== 0) {\n        frameRef.current = requestAnimationFrame(draw);\n        return;\n      }\n\n      const cw = w();\n      const cvh = vh();\n      ctx.clearRect(0, 0, cw, cvh);\n      const scroll = scrollRef.current;\n\n      // Smooth-lerp mouse\n      const mc = mouseCurrent.current;\n      const mt = mouseTarget.current;\n      mc.x += (mt.x - mc.x) * MOUSE_LERP;\n      mc.y += (mt.y - mc.y) * MOUSE_LERP;\n\n      const mouseOffX = LAYER_MOUSE_PARALLAX.map((p) => mc.x * p);\n      const mouseOffY = LAYER_MOUSE_PARALLAX.map((p) => mc.y * p);\n\n      const saving = isSaving();\n\n      for (const s of starsRef.current) {\n        const scrollOffset = scroll * LAYER_SCROLL_PARALLAX[s.layer];\n        const drawX = s.x + mouseOffX[s.layer];\n        // Viewport-relative Y: wrap star positions around scroll\n        const rawY = ((s.y - scrollOffset) % (cvh * 3) + cvh * 3) % (cvh * 3) - cvh;\n        const drawY = rawY;\n\n        // Viewport culling — canvas is viewport-sized now\n        if (drawY < -20 || drawY > cvh + 20) {\n          s.y += s.speed * 0.1;\n          continue;\n        }\n\n        const flicker = saving ? 0.85 : Math.sin(t * s.pulse + s.x) * 0.3 + 0.7;\n        const a = s.alpha * flicker;\n\n        // Glow only for big stars AND not in battery-saver\n        if (!saving && s.size > 1.8) {\n          const r = s.size * 3;\n          const g = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, r);\n          g.addColorStop(0, s.glowColor + (a * 0.18).toFixed(3) + ')');\n          g.addColorStop(1, 'transparent');\n          ctx.fillStyle = g;\n          ctx.beginPath();\n          ctx.arc(drawX, drawY, r, 0, 6.2832);\n          ctx.fill();\n        }\n\n        // Core dot\n        ctx.beginPath();\n        ctx.arc(drawX, drawY, s.size, 0, 6.2832);\n        ctx.fillStyle = s.coreColor + a.toFixed(3) + ')';\n        ctx.fill();\n\n        // Cross-flare — only on desktop, not saving, big near-layer stars\n        if (!saving && s.layer === 2 && s.size > 2.2 && cw >= 768) {\n          ctx.globalAlpha = a * 0.18;\n          ctx.strokeStyle = s.coreColor + '1)';\n          ctx.lineWidth = 0.5;\n          const fL = s.size * 5;\n          ctx.beginPath();\n          ctx.moveTo(drawX - fL, drawY);\n          ctx.lineTo(drawX + fL, drawY);\n          ctx.moveTo(drawX, drawY - fL);\n          ctx.lineTo(drawX, drawY + fL);\n          ctx.stroke();\n          ctx.globalAlpha = 1;\n        }\n\n        // Drift\n        s.y += s.speed * 0.1;\n        s.x -= s.speed * 0.03;\n        if (s.x < 0) s.x = cw;\n      }\n\n      /* Shooting stars — skip in battery-saver */\n      if (!saving) {\n        if (t - lastShootRef.current > 5000 + Math.random() * 7000) {\n          lastShootRef.current = t;\n          const angle = Math.PI / 5 + Math.random() * 0.5;\n          const spd = 14 + Math.random() * 8;\n          shootingRef.current.push({\n            x: Math.random() * cw * 0.6 + cw * 0.1,\n            y: Math.random() * cvh * 0.4,\n            vx: Math.cos(angle) * spd,\n            vy: Math.sin(angle) * spd,\n            life: 1,\n          });\n        }\n\n        shootingRef.current = shootingRef.current.filter((sh) => sh.life > 0);\n        for (const sh of shootingRef.current) {\n          const len = 120 * sh.life;\n          const tX = sh.x - (sh.vx * len) / 14;\n          const tY = sh.y - (sh.vy * len) / 14;\n          const g = ctx.createLinearGradient(sh.x, sh.y, tX, tY);\n          g.addColorStop(0, `rgba(255,200,140,${sh.life})`);\n          g.addColorStop(0.4, `rgba(255,69,0,${sh.life * 0.5})`);\n          g.addColorStop(1, 'transparent');\n          ctx.strokeStyle = g;\n          ctx.lineWidth = 1.5;\n          ctx.beginPath();\n          ctx.moveTo(sh.x, sh.y);\n          ctx.lineTo(tX, tY);\n          ctx.stroke();\n\n          const hg = ctx.createRadialGradient(sh.x, sh.y, 0, sh.x, sh.y, 5);\n          hg.addColorStop(0, `rgba(255,255,255,${sh.life})`);\n          hg.addColorStop(1, 'transparent');\n          ctx.fillStyle = hg;\n          ctx.beginPath();\n          ctx.arc(sh.x, sh.y, 5, 0, 6.2832);\n          ctx.fill();\n\n          sh.x += sh.vx;\n          sh.y += sh.vy;\n          sh.life -= 0.009;\n        }\n      }\n\n      frameRef.current = requestAnimationFrame(draw);\n    };\n\n    frameRef.current = requestAnimationFrame(draw);\n\n    return () => {\n      cancelAnimationFrame(frameRef.current);\n      window.removeEventListener('resize', resize);\n      window.removeEventListener('scroll', onScroll);\n      window.removeEventListener('mousemove', onMouseMove);\n      document.removeEventListener('mouseleave', onMouseLeave);\n    };\n  }, []);\n\n  return (\n    <canvas\n     \n      ref={canvasRef}\n      className=\"fixed inset-0 pointer-events-none\"\n      style={{ zIndex: 0 }}\n      aria-hidden=\"true\"\n    />\n  );\n}\n\nexport default memo(StarField);\n","encoding":"utf8"}
+import { useEffect, useRef, memo } from 'react';
+
+interface Star {
+  x: number;
+  y: number;
+  size: number;
+  alpha: number;
+  speed: number;
+  pulse: number;
+  layer: number;
+  coreColor: string;
+  glowColor: string;
+}
+
+// Scroll parallax per layer
+const LAYER_SCROLL_PARALLAX = [0.02, 0.06, 0.14];
+// Mouse parallax per layer
+const LAYER_MOUSE_PARALLAX = [8, 28, 60];
+const LAYER_SIZE = [0.6, 1.0, 1.8];
+const LAYER_ALPHA = [0.25, 0.45, 0.7];
+const MOUSE_LERP = 0.06;
+
+// Check if battery-saver mode is active
+const isSaving = () => document.documentElement.classList.contains('battery-saver');
+
+function StarField() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef(0);
+  const starsRef = useRef<Star[]>([]);
+  const shootingRef = useRef<{ x: number; y: number; vx: number; vy: number; life: number }[]>([]);
+  const lastShootRef = useRef(0);
+  const scrollRef = useRef(0);
+  const viewH = useRef(0);
+  const mouseTarget = useRef({ x: 0, y: 0 });
+  const mouseCurrent = useRef({ x: 0, y: 0 });
+  // Frame-skip for battery saver: draw every Nth frame
+  const frameCount = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true })!;
+
+    const resize = () => {
+      // Cap DPR at 1 on mobile for massive perf gain
+      const isMobile = window.innerWidth < 768;
+      const dpr = isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5);
+      const w = window.innerWidth;
+      // Only size canvas to viewport, not full scroll height
+      const h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      viewH.current = h;
+      initStars(w, h);
+    };
+
+    const initStars = (w: number, h: number) => {
+      const isMobile = w < 768;
+      // Significantly reduced counts
+      const maxCount = isMobile ? 100 : 250;
+      const count = Math.min(Math.floor((w * h) / 6000), maxCount);
+
+      starsRef.current = Array.from({ length: count }, () => {
+        const layer = Math.random() < 0.4 ? 0 : Math.random() < 0.65 ? 1 : 2;
+        const hue = Math.random() > 0.88 ? 15 + Math.random() * 20 : 220 + Math.random() * 30;
+        return {
+          x: Math.random() * w,
+          y: Math.random() * h * 3, // spread across scrollable area
+          size: (Math.random() * 1.5 + 0.3) * LAYER_SIZE[layer],
+          alpha: (Math.random() * 0.4 + 0.15) * LAYER_ALPHA[layer],
+          speed: (Math.random() * 0.15 + 0.02) * (layer + 1),
+          pulse: Math.random() * 0.004 + 0.001,
+          layer,
+          coreColor: `hsla(${hue | 0}, 40%, 92%, `,
+          glowColor: `hsla(${hue | 0}, 60%, 85%, `,
+        };
+      });
+    };
+
+    /* Scroll tracking */
+    let scrollTicking = false;
+    const onScroll = () => {
+      if (!scrollTicking) {
+        scrollTicking = true;
+        requestAnimationFrame(() => {
+          scrollRef.current = window.scrollY;
+          scrollTicking = false;
+        });
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    /* Mouse tracking */
+    const onMouseMove = (e: MouseEvent) => {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      mouseTarget.current.x = (e.clientX - cx) / cx;
+      mouseTarget.current.y = (e.clientY - cy) / cy;
+    };
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+
+    const onMouseLeave = () => {
+      mouseTarget.current.x = 0;
+      mouseTarget.current.y = 0;
+    };
+    document.addEventListener('mouseleave', onMouseLeave);
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    const w = () => window.innerWidth;
+    const vh = () => viewH.current;
+
+    /* Draw loop */
+    const draw = (t: number) => {
+      frameCount.current++;
+
+      // In battery-saver mode, only draw every 3rd frame (~20fps)
+      if (isSaving() && frameCount.current % 3 !== 0) {
+        frameRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
+      const cw = w();
+      const cvh = vh();
+      ctx.clearRect(0, 0, cw, cvh);
+      const scroll = scrollRef.current;
+
+      // Smooth-lerp mouse
+      const mc = mouseCurrent.current;
+      const mt = mouseTarget.current;
+      mc.x += (mt.x - mc.x) * MOUSE_LERP;
+      mc.y += (mt.y - mc.y) * MOUSE_LERP;
+
+      const mouseOffX = LAYER_MOUSE_PARALLAX.map((p) => mc.x * p);
+      const mouseOffY = LAYER_MOUSE_PARALLAX.map((p) => mc.y * p);
+
+      const saving = isSaving();
+
+      for (const s of starsRef.current) {
+        const scrollOffset = scroll * LAYER_SCROLL_PARALLAX[s.layer];
+        const drawX = s.x + mouseOffX[s.layer];
+        // Viewport-relative Y: wrap star positions around scroll
+        const rawY = ((s.y - scrollOffset) % (cvh * 3) + cvh * 3) % (cvh * 3) - cvh;
+        const drawY = rawY;
+
+        // Viewport culling — canvas is viewport-sized now
+        if (drawY < -20 || drawY > cvh + 20) {
+          s.y += s.speed * 0.1;
+          continue;
+        }
+
+        const flicker = saving ? 0.85 : Math.sin(t * s.pulse + s.x) * 0.3 + 0.7;
+        const a = s.alpha * flicker;
+
+        // Glow only for big stars AND not in battery-saver
+        if (!saving && s.size > 1.8) {
+          const r = s.size * 3;
+          const g = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, r);
+          g.addColorStop(0, s.glowColor + (a * 0.18).toFixed(3) + ')');
+          g.addColorStop(1, 'transparent');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, r, 0, 6.2832);
+          ctx.fill();
+        }
+
+        // Core dot
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, s.size, 0, 6.2832);
+        ctx.fillStyle = s.coreColor + a.toFixed(3) + ')';
+        ctx.fill();
+
+        // Cross-flare — only on desktop, not saving, big near-layer stars
+        if (!saving && s.layer === 2 && s.size > 2.2 && cw >= 768) {
+          ctx.globalAlpha = a * 0.18;
+          ctx.strokeStyle = s.coreColor + '1)';
+          ctx.lineWidth = 0.5;
+          const fL = s.size * 5;
+          ctx.beginPath();
+          ctx.moveTo(drawX - fL, drawY);
+          ctx.lineTo(drawX + fL, drawY);
+          ctx.moveTo(drawX, drawY - fL);
+          ctx.lineTo(drawX, drawY + fL);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        // Drift
+        s.y += s.speed * 0.1;
+        s.x -= s.speed * 0.03;
+        if (s.x < 0) s.x = cw;
+      }
+
+      /* Shooting stars — skip in battery-saver */
+      if (!saving) {
+        if (t - lastShootRef.current > 5000 + Math.random() * 7000) {
+          lastShootRef.current = t;
+          const angle = Math.PI / 5 + Math.random() * 0.5;
+          const spd = 14 + Math.random() * 8;
+          shootingRef.current.push({
+            x: Math.random() * cw * 0.6 + cw * 0.1,
+            y: Math.random() * cvh * 0.4,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd,
+            life: 1,
+          });
+        }
+
+        shootingRef.current = shootingRef.current.filter((sh) => sh.life > 0);
+        for (const sh of shootingRef.current) {
+          const len = 120 * sh.life;
+          const tX = sh.x - (sh.vx * len) / 14;
+          const tY = sh.y - (sh.vy * len) / 14;
+          const g = ctx.createLinearGradient(sh.x, sh.y, tX, tY);
+          g.addColorStop(0, `rgba(255,200,140,${sh.life})`);
+          g.addColorStop(0.4, `rgba(255,69,0,${sh.life * 0.5})`);
+          g.addColorStop(1, 'transparent');
+          ctx.strokeStyle = g;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(sh.x, sh.y);
+          ctx.lineTo(tX, tY);
+          ctx.stroke();
+
+          const hg = ctx.createRadialGradient(sh.x, sh.y, 0, sh.x, sh.y, 5);
+          hg.addColorStop(0, `rgba(255,255,255,${sh.life})`);
+          hg.addColorStop(1, 'transparent');
+          ctx.fillStyle = hg;
+          ctx.beginPath();
+          ctx.arc(sh.x, sh.y, 5, 0, 6.2832);
+          ctx.fill();
+
+          sh.x += sh.vx;
+          sh.y += sh.vy;
+          sh.life -= 0.009;
+        }
+      }
+
+      frameRef.current = requestAnimationFrame(draw);
+    };
+
+    frameRef.current = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(frameRef.current);
+      window.removeEventListener('resize', resize);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseleave', onMouseLeave);
+    };
+  }, []);
+
+  return (
+    <canvas
+     
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none"
+      style={{ zIndex: 0 }}
+      aria-hidden="true"
+    />
+  );
+}
+
+export default memo(StarField);

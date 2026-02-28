@@ -1,1 +1,184 @@
-{"path":"src/components/DiscoveryHints.tsx","content":"import { useState, useEffect, useCallback, memo } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useBatterySaver } from '@/hooks/useBatterySaver';\nimport {\n  TerminalSquare, Search, MousePointerClick, Trophy, Gamepad2 } from\n'lucide-react';\n\n/* ================================================================\n   DISCOVERY HINTS\n\n   Subtle, non-intrusive nudges for first-time visitors that point\n   to hidden features.  Each hint shows ONCE EVER (localStorage).\n   They appear staggered over time, dismissed on click or auto-fade.\n\n   • Tiny pill at bottom-center\n   • Appears → stays 8s → fades out\n   • Never shows the same hint twice\n   • Respects Battery Saver (disabled)\n   • Doesn't stack — only 1 hint at a time\n   ================================================================ */\n\ninterface Hint {\n  id: string;\n  icon: React.ReactNode;\n  text: string;\n  delay: number; // ms after mount before showing\n}\n\nconst HINTS: Hint[] = [\n{\n  id: 'terminal',\n  icon: <TerminalSquare className=\"w-3.5 h-3.5\" />,\n  text: 'Press ~ to open the Command Terminal',\n  delay: 15_000\n},\n{\n  id: 'palette',\n  icon: <Search className=\"w-3.5 h-3.5\" />,\n  text: 'Try Ctrl+K for quick search',\n  delay: 40_000\n},\n{\n  id: 'mars-globe',\n  icon: <MousePointerClick className=\"w-3.5 h-3.5\" />,\n  text: 'Double-click the Mars globe for a surprise',\n  delay: 65_000\n},\n{\n  id: 'achievements',\n  icon: <Trophy className=\"w-3.5 h-3.5\" />,\n  text: '10 hidden achievements to discover',\n  delay: 100_000\n},\n{\n  id: 'game',\n  icon: <Gamepad2 className=\"w-3.5 h-3.5\" />,\n  text: 'Type \"game\" in the terminal to play',\n  delay: 140_000\n}];\n\n\nconst STORAGE_KEY = 'ares-hints-seen';\nconst DISPLAY_DURATION = 8_000;\n\nfunction getSeenHints(): Set<string> {\n  try {\n    return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));\n  } catch {return new Set();}\n}\n\nfunction markSeen(id: string) {\n  const seen = getSeenHints();\n  seen.add(id);\n  localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));\n}\n\nfunction DiscoveryHints() {\n  const { isSaving: isBatterySaver } = useBatterySaver();\n  const [current, setCurrent] = useState<Hint | null>(null);\n  const [visible, setVisible] = useState(false);\n\n  const dismiss = useCallback(() => {\n    setVisible(false);\n  }, []);\n\n  useEffect(() => {\n    if (isBatterySaver) return;\n\n    const seen = getSeenHints();\n    const remaining = HINTS.filter((h) => !seen.has(h.id));\n    if (remaining.length === 0) return;\n\n    const timers: ReturnType<typeof setTimeout>[] = [];\n\n    // Schedule each remaining hint\n    // But only show 1 at a time — use a queue via sequential timeouts\n    let cumulativeDelay = 0;\n\n    for (const hint of remaining) {\n      const showAt = hint.delay;\n      timers.push(\n        setTimeout(() => {\n          // Only show if nothing else is currently showing\n          setCurrent((prev) => {\n            if (prev) return prev; // something already showing\n            return hint;\n          });\n        }, showAt)\n      );\n    }\n\n    return () => timers.forEach(clearTimeout);\n  }, [isBatterySaver]);\n\n  // When current hint changes, show → auto-dismiss\n  useEffect(() => {\n    if (!current) return;\n    setVisible(true);\n    markSeen(current.id);\n\n    const dismissTimer = setTimeout(() => {\n      setVisible(false);\n    }, DISPLAY_DURATION);\n\n    return () => clearTimeout(dismissTimer);\n  }, [current]);\n\n  // When visible becomes false and we had a current, clear it after exit animation\n  useEffect(() => {\n    if (!visible && current) {\n      const clearTimer = setTimeout(() => {\n        setCurrent(null);\n      }, 500); // wait for exit animation\n      return () => clearTimeout(clearTimer);\n    }\n  }, [visible, current]);\n\n  if (isBatterySaver) return null;\n\n  return (\n    <div className=\"fixed bottom-32 sm:bottom-24 left-1/2 -translate-x-1/2 z-[85] pointer-events-none\">\n      <AnimatePresence>\n        {visible && current &&\n        <motion.button\n          initial={{ opacity: 0, y: 12, scale: 0.95 }}\n          animate={{ opacity: 1, y: 0, scale: 1 }}\n          exit={{ opacity: 0, y: -6, scale: 0.97 }}\n          transition={{ duration: 0.4, ease: EXPO_OUT }}\n          onClick={dismiss}\n          className=\"pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer\n              bg-white/[0.05] border border-white/[0.08] backdrop-blur-md\n              shadow-[0_0_20px_rgba(0,0,0,0.25)]\n              hover:bg-white/[0.08] transition-colors\">\n\n\n\n\n            {/* Pulsing dot */}\n            <span className=\"relative flex-shrink-0\">\n              <span className=\"absolute inset-0 w-2 h-2 rounded-full bg-primary/40 animate-ping\" />\n              <span className=\"relative w-2 h-2 rounded-full bg-primary/70 block\" />\n            </span>\n\n            {/* Icon */}\n            <span className=\"text-primary/60 flex-shrink-0\">{current.icon}</span>\n\n            {/* Text */}\n            <span className=\"text-[11px] font-mono text-white/50 whitespace-nowrap\">\n              {current.text}\n            </span>\n\n            {/* Dismiss hint */}\n            <span className=\"text-[8px] font-display tracking-[0.12em] text-white/50 ml-1\">\n              ✕\n            </span>\n          </motion.button>\n        }\n      </AnimatePresence>\n    </div>);\n\n}\n\nexport default memo(DiscoveryHints);","encoding":"utf8"}
+import { useState, useEffect, useCallback, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+import { useBatterySaver } from '@/hooks/useBatterySaver';
+import {
+  TerminalSquare, Search, MousePointerClick, Trophy, Gamepad2 } from
+'lucide-react';
+
+/* ================================================================
+   DISCOVERY HINTS
+
+   Subtle, non-intrusive nudges for first-time visitors that point
+   to hidden features.  Each hint shows ONCE EVER (localStorage).
+   They appear staggered over time, dismissed on click or auto-fade.
+
+   • Tiny pill at bottom-center
+   • Appears → stays 8s → fades out
+   • Never shows the same hint twice
+   • Respects Battery Saver (disabled)
+   • Doesn't stack — only 1 hint at a time
+   ================================================================ */
+
+interface Hint {
+  id: string;
+  icon: React.ReactNode;
+  text: string;
+  delay: number; // ms after mount before showing
+}
+
+const HINTS: Hint[] = [
+{
+  id: 'terminal',
+  icon: <TerminalSquare className="w-3.5 h-3.5" />,
+  text: 'Press ~ to open the Command Terminal',
+  delay: 15_000
+},
+{
+  id: 'palette',
+  icon: <Search className="w-3.5 h-3.5" />,
+  text: 'Try Ctrl+K for quick search',
+  delay: 40_000
+},
+{
+  id: 'mars-globe',
+  icon: <MousePointerClick className="w-3.5 h-3.5" />,
+  text: 'Double-click the Mars globe for a surprise',
+  delay: 65_000
+},
+{
+  id: 'achievements',
+  icon: <Trophy className="w-3.5 h-3.5" />,
+  text: '10 hidden achievements to discover',
+  delay: 100_000
+},
+{
+  id: 'game',
+  icon: <Gamepad2 className="w-3.5 h-3.5" />,
+  text: 'Type "game" in the terminal to play',
+  delay: 140_000
+}];
+
+
+const STORAGE_KEY = 'ares-hints-seen';
+const DISPLAY_DURATION = 8_000;
+
+function getSeenHints(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+  } catch {return new Set();}
+}
+
+function markSeen(id: string) {
+  const seen = getSeenHints();
+  seen.add(id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...seen]));
+}
+
+function DiscoveryHints() {
+  const { isSaving: isBatterySaver } = useBatterySaver();
+  const [current, setCurrent] = useState<Hint | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  const dismiss = useCallback(() => {
+    setVisible(false);
+  }, []);
+
+  useEffect(() => {
+    if (isBatterySaver) return;
+
+    const seen = getSeenHints();
+    const remaining = HINTS.filter((h) => !seen.has(h.id));
+    if (remaining.length === 0) return;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    // Schedule each remaining hint
+    // But only show 1 at a time — use a queue via sequential timeouts
+    let cumulativeDelay = 0;
+
+    for (const hint of remaining) {
+      const showAt = hint.delay;
+      timers.push(
+        setTimeout(() => {
+          // Only show if nothing else is currently showing
+          setCurrent((prev) => {
+            if (prev) return prev; // something already showing
+            return hint;
+          });
+        }, showAt)
+      );
+    }
+
+    return () => timers.forEach(clearTimeout);
+  }, [isBatterySaver]);
+
+  // When current hint changes, show → auto-dismiss
+  useEffect(() => {
+    if (!current) return;
+    setVisible(true);
+    markSeen(current.id);
+
+    const dismissTimer = setTimeout(() => {
+      setVisible(false);
+    }, DISPLAY_DURATION);
+
+    return () => clearTimeout(dismissTimer);
+  }, [current]);
+
+  // When visible becomes false and we had a current, clear it after exit animation
+  useEffect(() => {
+    if (!visible && current) {
+      const clearTimer = setTimeout(() => {
+        setCurrent(null);
+      }, 500); // wait for exit animation
+      return () => clearTimeout(clearTimer);
+    }
+  }, [visible, current]);
+
+  if (isBatterySaver) return null;
+
+  return (
+    <div className="fixed bottom-32 sm:bottom-24 left-1/2 -translate-x-1/2 z-[85] pointer-events-none">
+      <AnimatePresence>
+        {visible && current &&
+        <motion.button
+          initial={{ opacity: 0, y: 12, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.97 }}
+          transition={{ duration: 0.4, ease: EXPO_OUT }}
+          onClick={dismiss}
+          className="pointer-events-auto flex items-center gap-2 px-4 py-2 rounded-full cursor-pointer
+              bg-white/[0.05] border border-white/[0.08] backdrop-blur-md
+              shadow-[0_0_20px_rgba(0,0,0,0.25)]
+              hover:bg-white/[0.08] transition-colors">
+
+
+
+
+            {/* Pulsing dot */}
+            <span className="relative flex-shrink-0">
+              <span className="absolute inset-0 w-2 h-2 rounded-full bg-primary/40 animate-ping" />
+              <span className="relative w-2 h-2 rounded-full bg-primary/70 block" />
+            </span>
+
+            {/* Icon */}
+            <span className="text-primary/60 flex-shrink-0">{current.icon}</span>
+
+            {/* Text */}
+            <span className="text-[11px] font-mono text-white/50 whitespace-nowrap">
+              {current.text}
+            </span>
+
+            {/* Dismiss hint */}
+            <span className="text-[8px] font-display tracking-[0.12em] text-white/50 ml-1">
+              ✕
+            </span>
+          </motion.button>
+        }
+      </AnimatePresence>
+    </div>);
+
+}
+
+export default memo(DiscoveryHints);

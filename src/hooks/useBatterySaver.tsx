@@ -1,1 +1,98 @@
-{"path":"src/hooks/useBatterySaver.tsx","content":"import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';\n\ninterface BatterySaverCtx {\n  /** true when animations should be reduced */\n  isSaving: boolean;\n  /** user explicitly toggled */\n  toggle: () => void;\n  /** auto-detected mobile device */\n  isMobile: boolean;\n  /** battery level (0-1) if available */\n  batteryLevel: number | null;\n}\n\nconst BatterySaverContext = createContext<BatterySaverCtx>({\n  isSaving: false,\n  toggle: () => {},\n  isMobile: false,\n  batteryLevel: null,\n});\n\nexport function BatterySaverProvider({ children }: { children: ReactNode }) {\n  const [userOverride, setUserOverride] = useState<boolean | null>(null);\n  const [isMobile, setIsMobile] = useState(false);\n  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);\n  const [prefersReduced, setPrefersReduced] = useState(false);\n\n  // Detect mobile via viewport + touch\n  useEffect(() => {\n    const check = () => {\n      const mobile =\n        window.innerWidth < 768 ||\n        'ontouchstart' in window ||\n        navigator.maxTouchPoints > 0;\n      setIsMobile(mobile);\n    };\n    check();\n    window.addEventListener('resize', check);\n    return () => window.removeEventListener('resize', check);\n  }, []);\n\n  // Detect prefers-reduced-motion\n  useEffect(() => {\n    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');\n    setPrefersReduced(mql.matches);\n    const handler = (e: MediaQueryListEvent) => setPrefersReduced(e.matches);\n    mql.addEventListener('change', handler);\n    return () => mql.removeEventListener('change', handler);\n  }, []);\n\n  // Battery API (if available)\n  useEffect(() => {\n    let mounted = true;\n    const nav = navigator as any;\n    if (nav.getBattery) {\n      nav.getBattery().then((batt: any) => {\n        if (!mounted) return;\n        setBatteryLevel(batt.level);\n        const update = () => mounted && setBatteryLevel(batt.level);\n        batt.addEventListener('levelchange', update);\n      });\n    }\n    return () => { mounted = false; };\n  }, []);\n\n  // Auto-detect: save if mobile, low battery (<20%), or prefers-reduced\n  const autoSave =\n    prefersReduced ||\n    (isMobile && (batteryLevel === null || batteryLevel < 0.3)) ||\n    (batteryLevel !== null && batteryLevel < 0.2);\n\n  const isSaving = userOverride !== null ? userOverride : autoSave;\n\n  const toggle = useCallback(() => {\n    setUserOverride((prev) => (prev !== null ? !prev : !autoSave));\n  }, [autoSave]);\n\n  // Apply CSS class on <html> for global animation reduction\n  useEffect(() => {\n    const html = document.documentElement;\n    if (isSaving) {\n      html.classList.add('battery-saver');\n      html.style.setProperty('--anim-duration-scale', '0');\n    } else {\n      html.classList.remove('battery-saver');\n      html.style.setProperty('--anim-duration-scale', '1');\n    }\n  }, [isSaving]);\n\n  return (\n    <BatterySaverContext.Provider value={{ isSaving, toggle, isMobile, batteryLevel }}>\n      {children}\n    </BatterySaverContext.Provider>\n  );\n}\n\nexport function useBatterySaver() {\n  return useContext(BatterySaverContext);\n}\n","encoding":"utf8"}
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+
+interface BatterySaverCtx {
+  /** true when animations should be reduced */
+  isSaving: boolean;
+  /** user explicitly toggled */
+  toggle: () => void;
+  /** auto-detected mobile device */
+  isMobile: boolean;
+  /** battery level (0-1) if available */
+  batteryLevel: number | null;
+}
+
+const BatterySaverContext = createContext<BatterySaverCtx>({
+  isSaving: false,
+  toggle: () => {},
+  isMobile: false,
+  batteryLevel: null,
+});
+
+export function BatterySaverProvider({ children }: { children: ReactNode }) {
+  const [userOverride, setUserOverride] = useState<boolean | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [prefersReduced, setPrefersReduced] = useState(false);
+
+  // Detect mobile via viewport + touch
+  useEffect(() => {
+    const check = () => {
+      const mobile =
+        window.innerWidth < 768 ||
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0;
+      setIsMobile(mobile);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Detect prefers-reduced-motion
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReduced(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReduced(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  // Battery API (if available)
+  useEffect(() => {
+    let mounted = true;
+    const nav = navigator as any;
+    if (nav.getBattery) {
+      nav.getBattery().then((batt: any) => {
+        if (!mounted) return;
+        setBatteryLevel(batt.level);
+        const update = () => mounted && setBatteryLevel(batt.level);
+        batt.addEventListener('levelchange', update);
+      });
+    }
+    return () => { mounted = false; };
+  }, []);
+
+  // Auto-detect: save if mobile, low battery (<20%), or prefers-reduced
+  const autoSave =
+    prefersReduced ||
+    (isMobile && (batteryLevel === null || batteryLevel < 0.3)) ||
+    (batteryLevel !== null && batteryLevel < 0.2);
+
+  const isSaving = userOverride !== null ? userOverride : autoSave;
+
+  const toggle = useCallback(() => {
+    setUserOverride((prev) => (prev !== null ? !prev : !autoSave));
+  }, [autoSave]);
+
+  // Apply CSS class on <html> for global animation reduction
+  useEffect(() => {
+    const html = document.documentElement;
+    if (isSaving) {
+      html.classList.add('battery-saver');
+      html.style.setProperty('--anim-duration-scale', '0');
+    } else {
+      html.classList.remove('battery-saver');
+      html.style.setProperty('--anim-duration-scale', '1');
+    }
+  }, [isSaving]);
+
+  return (
+    <BatterySaverContext.Provider value={{ isSaving, toggle, isMobile, batteryLevel }}>
+      {children}
+    </BatterySaverContext.Provider>
+  );
+}
+
+export function useBatterySaver() {
+  return useContext(BatterySaverContext);
+}

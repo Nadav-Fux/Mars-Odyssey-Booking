@@ -1,1 +1,465 @@
-{"path":"src/components/EmergencyButton.tsx","content":"import { useState, useRef, useCallback, useEffect, memo } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { gsap } from '@/lib/gsap';\nimport { ShieldAlert } from 'lucide-react';\nimport { EXPO_OUT } from '@/lib/easing';\n\n/* ================================================================\n   EMERGENCY ALERT BUTTON\n\n   Floating trigger in the top-right.  On click:\n     Phase 0  → save current theme, override all colours to red\n     Phase 1  → white flash (0.1 s)\n     Phase 2  → GSAP shakes #root for ~2 s (haptic vibration)\n     Phase 3  → siren starts (Web Audio two-tone sweep)\n     Phase 4  → red vignette + scanlines + pulsing red flashes\n     Phase 5  → large Warning SVG fades/bounces in, flashing\n\n   \"STAND DOWN\" button reverses everything.\n   ================================================================ */\n\n// ── Theme save / override / restore ──\nconst THEME_KEYS = [\n'--color-primary',\n'--color-accent',\n'--color-ring',\n'--color-border'] as\nconst;\n\nfunction saveTheme(): Record<string, string> {\n  const s = document.documentElement.style;\n  const saved: Record<string, string> = {};\n  THEME_KEYS.forEach((k) => {saved[k] = s.getPropertyValue(k);});\n  return saved;\n}\n\nfunction applyRedTheme() {\n  const s = document.documentElement.style;\n  s.setProperty('--color-primary', '#ff0020');\n  s.setProperty('--color-accent', '#cc0018');\n  s.setProperty('--color-ring', '#ff0020');\n  s.setProperty('--color-border', 'rgba(255,0,32,0.25)');\n}\n\nfunction restoreTheme(saved: Record<string, string>) {\n  const s = document.documentElement.style;\n  THEME_KEYS.forEach((k) => {\n    if (saved[k]) s.setProperty(k, saved[k]);else\n    s.removeProperty(k);\n  });\n}\n\n// ── Siren (Web Audio) ──\ninterface SirenNodes {ctx: AudioContext;stop(): void;}\n\nfunction createSiren(): SirenNodes {\n  const ctx = new AudioContext();\n  ctx.resume();\n\n  const master = ctx.createGain();\n  master.gain.value = 0;\n  master.connect(ctx.destination);\n\n  // Main tone\n  const osc = ctx.createOscillator();\n  osc.type = 'sine';\n  osc.frequency.value = 660;\n  const oscG = ctx.createGain();\n  oscG.gain.value = 0.09;\n  osc.connect(oscG).connect(master);\n  osc.start();\n\n  // Frequency sweep LFO\n  const lfo = ctx.createOscillator();\n  lfo.type = 'sine';\n  lfo.frequency.value = 1.8;\n  const lfoG = ctx.createGain();\n  lfoG.gain.value = 220;\n  lfo.connect(lfoG).connect(osc.frequency);\n  lfo.start();\n\n  // Second harmonic for depth\n  const osc2 = ctx.createOscillator();\n  osc2.type = 'sawtooth';\n  osc2.frequency.value = 330;\n  const osc2G = ctx.createGain();\n  osc2G.gain.value = 0.03;\n  osc2.connect(osc2G).connect(master);\n  osc2.start();\n\n  const lfo2 = ctx.createOscillator();\n  lfo2.type = 'sine';\n  lfo2.frequency.value = 1.8;\n  const lfo2G = ctx.createGain();\n  lfo2G.gain.value = 110;\n  lfo2.connect(lfo2G).connect(osc2.frequency);\n  lfo2.start();\n\n  // Fade in\n  master.gain.setValueAtTime(0, ctx.currentTime);\n  master.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.3);\n\n  return {\n    ctx,\n    stop: () => {\n      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);\n      setTimeout(() => {\n        [osc, lfo, osc2, lfo2].forEach((n) => {try {n.stop();} catch {}});\n        ctx.close().catch(() => {});\n      }, 700);\n    }\n  };\n}\n\n// ── GSAP page shake ──\nfunction shakeUI(): gsap.core.Timeline {\n  const el = document.getElementById('root');\n  if (!el) return gsap.timeline();\n\n  const kf = Array.from({ length: 28 }, () => ({\n    x: gsap.utils.random(-10, 10),\n    y: gsap.utils.random(-6, 6),\n    rotation: gsap.utils.random(-0.7, 0.7),\n    duration: 0.06\n  }));\n  kf.push({ x: 0, y: 0, rotation: 0, duration: 0.35 });\n\n  return gsap.to(el, { keyframes: kf, ease: 'none' });\n}\n\n// ── Warning SVG ──\nfunction WarningSVG() {\n  return (\n    <svg viewBox=\"0 0 200 200\" className=\"w-full h-full\" fill=\"none\">\n      <defs>\n        <filter id=\"em-glow\">\n          <feGaussianBlur stdDeviation=\"6\" />\n          <feMerge><feMergeNode /><feMergeNode in=\"SourceGraphic\" /></feMerge>\n        </filter>\n        <filter id=\"em-glow-lg\">\n          <feGaussianBlur stdDeviation=\"12\" />\n          <feMerge><feMergeNode /><feMergeNode in=\"SourceGraphic\" /></feMerge>\n        </filter>\n      </defs>\n\n      {/* Pulsing outer rings */}\n      <circle cx=\"100\" cy=\"100\" r=\"90\" stroke=\"#ff0020\" strokeWidth=\"1\" strokeOpacity=\"0.1\">\n        <animate attributeName=\"r\" values=\"90;96;90\" dur=\"1.5s\" repeatCount=\"indefinite\" />\n        <animate attributeName=\"stroke-opacity\" values=\"0.1;0.03;0.1\" dur=\"1.5s\" repeatCount=\"indefinite\" />\n      </circle>\n      <circle cx=\"100\" cy=\"100\" r=\"82\" stroke=\"#ff0020\" strokeWidth=\"0.5\" strokeOpacity=\"0.06\">\n        <animate attributeName=\"r\" values=\"82;88;82\" dur=\"2s\" repeatCount=\"indefinite\" />\n      </circle>\n\n      {/* Rotating scanner arc */}\n      <circle\n      cx=\"100\" cy=\"100\" r=\"75\"\n      stroke=\"#ff0020\" strokeWidth=\"2\" strokeOpacity=\"0.15\"\n      strokeDasharray=\"30 442\" strokeLinecap=\"round\"\n      fill=\"none\">\n\n        <animateTransform attributeName=\"transform\" type=\"rotate\" from=\"0 100 100\" to=\"360 100 100\" dur=\"3s\" repeatCount=\"indefinite\" />\n      </circle>\n\n      {/* Triangle (glow) */}\n      <path\n      d=\"M100 30 L170 155 L30 155 Z\"\n      stroke=\"#ff0020\" strokeWidth=\"5\" strokeOpacity=\"0.25\"\n      strokeLinejoin=\"round\" filter=\"url(#em-glow-lg)\" />\n\n      {/* Triangle (main) */}\n      <path\n      d=\"M100 30 L170 155 L30 155 Z\"\n      stroke=\"#ff0020\" strokeWidth=\"3\" strokeLinejoin=\"round\">\n\n        <animate attributeName=\"stroke-opacity\" values=\"1;0.5;1\" dur=\"0.8s\" repeatCount=\"indefinite\" />\n      </path>\n      {/* Triangle fill */}\n      <path d=\"M100 30 L170 155 L30 155 Z\" fill=\"#ff0020\" fillOpacity=\"0.04\" />\n\n      {/* Exclamation mark */}\n      <line x1=\"100\" y1=\"70\" x2=\"100\" y2=\"115\" stroke=\"#ff0020\" strokeWidth=\"6\" strokeLinecap=\"round\">\n        <animate attributeName=\"stroke-opacity\" values=\"1;0.4;1\" dur=\"0.6s\" repeatCount=\"indefinite\" />\n      </line>\n      <circle cx=\"100\" cy=\"135\" r=\"4\" fill=\"#ff0020\">\n        <animate attributeName=\"opacity\" values=\"1;0.4;1\" dur=\"0.6s\" repeatCount=\"indefinite\" />\n      </circle>\n\n      {/* WARNING text */}\n      <text x=\"100\" y=\"182\" textAnchor=\"middle\" fontSize=\"11\" fontFamily=\"Orbitron, monospace\" fontWeight=\"bold\" fill=\"#ff0020\" letterSpacing=\"5\">\n        <animate attributeName=\"opacity\" values=\"1;0.3;1\" dur=\"1s\" repeatCount=\"indefinite\" />\n        WARNING\n      </text>\n\n      {/* Corner markers */}\n      {[\n      [10, 10, 25, 10, 10, 25],\n      [190, 10, 175, 10, 190, 25],\n      [10, 190, 25, 190, 10, 175],\n      [190, 190, 175, 190, 190, 175]].\n      map(([x1, y1, x2, y2, x3, y3], i) =>\n      <g key={i}>\n          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke=\"#ff0020\" strokeWidth=\"1\" strokeOpacity=\"0.3\" />\n          <line x1={x1} y1={y1} x2={x3} y2={y3} stroke=\"#ff0020\" strokeWidth=\"1\" strokeOpacity=\"0.3\" />\n        </g>\n      )}\n    </svg>);\n\n}\n\n// ── Component ──\nfunction EmergencyButton() {\n  const [active, setActive] = useState(false);\n  const savedThemeRef = useRef<Record<string, string>>({});\n  const sirenRef = useRef<SirenNodes | null>(null);\n  const shakeRef = useRef<gsap.core.Timeline | null>(null);\n  const [flash, setFlash] = useState(false);\n\n  const activate = useCallback(() => {\n    if (active) return;\n\n    // Save & override theme\n    savedThemeRef.current = saveTheme();\n    applyRedTheme();\n\n    // White flash\n    setFlash(true);\n    setTimeout(() => setFlash(false), 120);\n\n    // Shake UI\n    shakeRef.current = shakeUI();\n\n    // Siren\n    sirenRef.current = createSiren();\n\n    setActive(true);\n  }, [active]);\n\n  const deactivate = useCallback(() => {\n    if (!active) return;\n\n    // Restore theme\n    restoreTheme(savedThemeRef.current);\n\n    // Stop siren\n    sirenRef.current?.stop();\n    sirenRef.current = null;\n\n    // Kill residual shake\n    shakeRef.current?.kill();\n    const root = document.getElementById('root');\n    if (root) gsap.set(root, { clearProps: 'x,y,rotation' });\n\n    setActive(false);\n  }, [active]);\n\n  // Toggle handler for the button\n  const toggle = useCallback(() => {\n    if (active) deactivate();\n    else activate();\n  }, [active, activate, deactivate]);\n\n  // Keyboard shortcut: M to deactivate\n  useEffect(() => {\n    const onKey = (e: KeyboardEvent) => {\n      if (e.key === 'm' || e.key === 'M') {\n        const tag = (e.target as HTMLElement)?.tagName;\n        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;\n        if (active) deactivate();\n      }\n    };\n    window.addEventListener('keydown', onKey);\n    return () => window.removeEventListener('keydown', onKey);\n  }, [active, deactivate]);\n\n  // Cleanup on unmount\n  useEffect(() => {\n    return () => {\n      sirenRef.current?.stop();\n      shakeRef.current?.kill();\n      const root = document.getElementById('root');\n      if (root) gsap.set(root, { clearProps: 'x,y,rotation' });\n    };\n  }, []);\n\n  return (\n    <>\n      {/* Trigger button — now toggles on/off */}\n      <motion.button\n        onClick={toggle}\n        className={`fixed top-5 right-16 lg:right-16 z-[94] w-10 h-10 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${\n        active ?\n        'bg-red-500/20 border-red-500/40 text-red-400 shadow-lg shadow-red-500/25' :\n        'bg-white/[0.03] border-white/[0.07] text-white/50 hover:text-red-400 hover:border-red-500/25 hover:bg-red-500/[0.06]'}`\n        }\n        whileHover={{ scale: 1.08 }}\n        whileTap={{ scale: 0.9 }}\n        title=\"Emergency Alert\">\n\n        <ShieldAlert className=\"w-4 h-4\" />\n      </motion.button>\n\n      {/* White flash overlay */}\n      <AnimatePresence>\n        {flash &&\n        <motion.div\n          className=\"fixed inset-0 z-[200] bg-white pointer-events-none\"\n          initial={{ opacity: 0.9 }}\n          animate={{ opacity: 0 }}\n          exit={{ opacity: 0 }}\n          transition={{ duration: 0.12 }} />\n\n        }\n      </AnimatePresence>\n\n      {/* Emergency overlay */}\n      <AnimatePresence>\n        {active &&\n        <>\n            {/* Red vignette + scan effects */}\n            <motion.div\n            className=\"fixed inset-0 z-[95] pointer-events-none\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 1 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: 0.3 }}>\n\n              {/* Radial red vignette */}\n              <div\n            className=\"absolute inset-0\"\n            style={{\n              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(255,0,20,0.1) 60%, rgba(255,0,20,0.22) 100%)'\n            }} />\n\n\n              {/* Pulsing red flash */}\n              <motion.div\n              className=\"absolute inset-0 bg-red-600/[0.06]\"\n              animate={{ opacity: [0, 0.08, 0, 0.04, 0] }}\n              transition={{ duration: 1.2, repeat: Infinity }} />\n\n\n              {/* Scan line */}\n              <motion.div\n              className=\"absolute left-0 right-0 h-px\"\n              style={{\n                background: 'linear-gradient(90deg, transparent, rgba(255,0,20,0.5), transparent)',\n                boxShadow: '0 0 20px rgba(255,0,20,0.3)'\n              }}\n              animate={{ top: ['0%', '100%'] }}\n              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }} />\n\n\n              {/* CRT scanlines */}\n              <div\n            className=\"absolute inset-0 opacity-[0.03]\"\n            style={{\n              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,20,0.15) 2px, rgba(255,0,20,0.15) 4px)'\n            }} />\n\n\n              {/* Pulsing red border */}\n              <motion.div\n              className=\"absolute inset-2 rounded-xl pointer-events-none\"\n              style={{ border: '1px solid rgba(255,0,20,0.15)' }}\n              animate={{ borderColor: ['rgba(255,0,20,0.15)', 'rgba(255,0,20,0.4)', 'rgba(255,0,20,0.15)'] }}\n              transition={{ duration: 1.5, repeat: Infinity }} />\n\n\n              {/* Corner brackets */}\n              {[\n            { top: 8, left: 8 },\n            { top: 8, right: 8 },\n            { bottom: 8, left: 8 },\n            { bottom: 8, right: 8 }].\n            map((pos, i) =>\n            <motion.div\n              key={i}\n              className=\"absolute w-6 h-6 sm:w-10 sm:h-10\"\n              style={{\n                ...pos,\n                borderTop: 'top' in pos ? '2px solid rgba(255,0,20,0.5)' : 'none',\n                borderBottom: 'bottom' in pos ? '2px solid rgba(255,0,20,0.5)' : 'none',\n                borderLeft: 'left' in pos && !('right' in pos) ? '2px solid rgba(255,0,20,0.5)' : 'none',\n                borderRight: 'right' in pos && !('left' in pos) ? '2px solid rgba(255,0,20,0.5)' : 'none'\n              } as React.CSSProperties}\n              animate={{ opacity: [0.4, 1, 0.4] }}\n              transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }} />\n\n            )}\n            </motion.div>\n\n            {/* Centre warning symbol */}\n            <motion.div\n            className=\"fixed inset-0 z-[96] flex items-center justify-center pointer-events-none\"\n            initial={{ opacity: 0, scale: 0.5 }}\n            animate={{ opacity: 1, scale: 1 }}\n            exit={{ opacity: 0, scale: 0.7 }}\n            transition={{ type: 'spring', stiffness: 250, damping: 18, delay: 0.15 }}>\n\n              <div className=\"w-40 h-40 sm:w-56 sm:h-56\">\n                <WarningSVG />\n              </div>\n            </motion.div>\n\n            {/* Top HUD bar */}\n            <motion.div\n            className=\"fixed top-14 lg:top-4 left-4 right-4 lg:left-24 z-[97] pointer-events-none\"\n            initial={{ opacity: 0, y: -20 }}\n            animate={{ opacity: 1, y: 0 }}\n            exit={{ opacity: 0, y: -20 }}\n            transition={{ delay: 0.2 }}>\n\n              <div className=\"flex items-center justify-between px-4 py-2.5 rounded-xl bg-red-950/50 backdrop-blur-md border border-red-500/25\">\n                <div className=\"flex items-center gap-2.5\">\n                  <motion.div\n                  animate={{ opacity: [1, 0.2, 1] }}\n                  transition={{ duration: 0.5, repeat: Infinity }}>\n\n                    <ShieldAlert className=\"w-4 h-4 text-red-500\" />\n                  </motion.div>\n                  <motion.span\n                  className=\"text-[10px] sm:text-xs font-display tracking-[0.2em] text-red-400 font-bold\"\n                  animate={{ opacity: [1, 0.5, 1] }}\n                  transition={{ duration: 0.8, repeat: Infinity }}>\n\n                    ⚠ EMERGENCY PROTOCOL ACTIVE\n                  </motion.span>\n                </div>\n                <div className=\"flex items-center gap-3\">\n                  <motion.div\n                  className=\"w-2 h-2 rounded-full bg-red-500\"\n                  animate={{ opacity: [1, 0.2, 1], scale: [1, 1.4, 1] }}\n                  transition={{ duration: 0.6, repeat: Infinity }} />\n\n                </div>\n              </div>\n            </motion.div>\n\n            {/* STAND DOWN button */}\n            <motion.div\n            className=\"fixed bottom-8 left-1/2 -translate-x-1/2 z-[97]\"\n            initial={{ opacity: 0, y: 30 }}\n            animate={{ opacity: 1, y: 0 }}\n            exit={{ opacity: 0, y: 20 }}\n            transition={{ delay: 0.5 }}>\n\n              <motion.button\n              onClick={deactivate}\n              className=\"px-8 py-3 rounded-xl bg-red-950/60 backdrop-blur-md border border-red-500/30 text-red-300 font-display text-sm font-bold tracking-[0.2em] cursor-pointer\"\n              whileHover={{ scale: 1.05, borderColor: 'rgba(255,0,20,0.6)' }}\n              whileTap={{ scale: 0.95 }}\n              animate={{ boxShadow: ['0 0 0px rgba(255,0,20,0)', '0 0 25px rgba(255,0,20,0.2)', '0 0 0px rgba(255,0,20,0)'] }}\n              transition={{ duration: 2, repeat: Infinity }}>\n\n                ■ STAND DOWN\n              </motion.button>\n            </motion.div>\n          </>\n        }\n      </AnimatePresence>\n    </>);\n\n}\n\nexport default memo(EmergencyButton);","encoding":"utf8"}
+import { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { gsap } from '@/lib/gsap';
+import { ShieldAlert } from 'lucide-react';
+import { EXPO_OUT } from '@/lib/easing';
+
+/* ================================================================
+   EMERGENCY ALERT BUTTON
+
+   Floating trigger in the top-right.  On click:
+     Phase 0  → save current theme, override all colours to red
+     Phase 1  → white flash (0.1 s)
+     Phase 2  → GSAP shakes #root for ~2 s (haptic vibration)
+     Phase 3  → siren starts (Web Audio two-tone sweep)
+     Phase 4  → red vignette + scanlines + pulsing red flashes
+     Phase 5  → large Warning SVG fades/bounces in, flashing
+
+   "STAND DOWN" button reverses everything.
+   ================================================================ */
+
+// ── Theme save / override / restore ──
+const THEME_KEYS = [
+'--color-primary',
+'--color-accent',
+'--color-ring',
+'--color-border'] as
+const;
+
+function saveTheme(): Record<string, string> {
+  const s = document.documentElement.style;
+  const saved: Record<string, string> = {};
+  THEME_KEYS.forEach((k) => {saved[k] = s.getPropertyValue(k);});
+  return saved;
+}
+
+function applyRedTheme() {
+  const s = document.documentElement.style;
+  s.setProperty('--color-primary', '#ff0020');
+  s.setProperty('--color-accent', '#cc0018');
+  s.setProperty('--color-ring', '#ff0020');
+  s.setProperty('--color-border', 'rgba(255,0,32,0.25)');
+}
+
+function restoreTheme(saved: Record<string, string>) {
+  const s = document.documentElement.style;
+  THEME_KEYS.forEach((k) => {
+    if (saved[k]) s.setProperty(k, saved[k]);else
+    s.removeProperty(k);
+  });
+}
+
+// ── Siren (Web Audio) ──
+interface SirenNodes {ctx: AudioContext;stop(): void;}
+
+function createSiren(): SirenNodes {
+  const ctx = new AudioContext();
+  ctx.resume();
+
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  master.connect(ctx.destination);
+
+  // Main tone
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 660;
+  const oscG = ctx.createGain();
+  oscG.gain.value = 0.09;
+  osc.connect(oscG).connect(master);
+  osc.start();
+
+  // Frequency sweep LFO
+  const lfo = ctx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 1.8;
+  const lfoG = ctx.createGain();
+  lfoG.gain.value = 220;
+  lfo.connect(lfoG).connect(osc.frequency);
+  lfo.start();
+
+  // Second harmonic for depth
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'sawtooth';
+  osc2.frequency.value = 330;
+  const osc2G = ctx.createGain();
+  osc2G.gain.value = 0.03;
+  osc2.connect(osc2G).connect(master);
+  osc2.start();
+
+  const lfo2 = ctx.createOscillator();
+  lfo2.type = 'sine';
+  lfo2.frequency.value = 1.8;
+  const lfo2G = ctx.createGain();
+  lfo2G.gain.value = 110;
+  lfo2.connect(lfo2G).connect(osc2.frequency);
+  lfo2.start();
+
+  // Fade in
+  master.gain.setValueAtTime(0, ctx.currentTime);
+  master.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.3);
+
+  return {
+    ctx,
+    stop: () => {
+      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.6);
+      setTimeout(() => {
+        [osc, lfo, osc2, lfo2].forEach((n) => {try {n.stop();} catch {}});
+        ctx.close().catch(() => {});
+      }, 700);
+    }
+  };
+}
+
+// ── GSAP page shake ──
+function shakeUI(): gsap.core.Timeline {
+  const el = document.getElementById('root');
+  if (!el) return gsap.timeline();
+
+  const kf = Array.from({ length: 28 }, () => ({
+    x: gsap.utils.random(-10, 10),
+    y: gsap.utils.random(-6, 6),
+    rotation: gsap.utils.random(-0.7, 0.7),
+    duration: 0.06
+  }));
+  kf.push({ x: 0, y: 0, rotation: 0, duration: 0.35 });
+
+  return gsap.to(el, { keyframes: kf, ease: 'none' });
+}
+
+// ── Warning SVG ──
+function WarningSVG() {
+  return (
+    <svg viewBox="0 0 200 200" className="w-full h-full" fill="none">
+      <defs>
+        <filter id="em-glow">
+          <feGaussianBlur stdDeviation="6" />
+          <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <filter id="em-glow-lg">
+          <feGaussianBlur stdDeviation="12" />
+          <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+
+      {/* Pulsing outer rings */}
+      <circle cx="100" cy="100" r="90" stroke="#ff0020" strokeWidth="1" strokeOpacity="0.1">
+        <animate attributeName="r" values="90;96;90" dur="1.5s" repeatCount="indefinite" />
+        <animate attributeName="stroke-opacity" values="0.1;0.03;0.1" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="100" cy="100" r="82" stroke="#ff0020" strokeWidth="0.5" strokeOpacity="0.06">
+        <animate attributeName="r" values="82;88;82" dur="2s" repeatCount="indefinite" />
+      </circle>
+
+      {/* Rotating scanner arc */}
+      <circle
+      cx="100" cy="100" r="75"
+      stroke="#ff0020" strokeWidth="2" strokeOpacity="0.15"
+      strokeDasharray="30 442" strokeLinecap="round"
+      fill="none">
+
+        <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="3s" repeatCount="indefinite" />
+      </circle>
+
+      {/* Triangle (glow) */}
+      <path
+      d="M100 30 L170 155 L30 155 Z"
+      stroke="#ff0020" strokeWidth="5" strokeOpacity="0.25"
+      strokeLinejoin="round" filter="url(#em-glow-lg)" />
+
+      {/* Triangle (main) */}
+      <path
+      d="M100 30 L170 155 L30 155 Z"
+      stroke="#ff0020" strokeWidth="3" strokeLinejoin="round">
+
+        <animate attributeName="stroke-opacity" values="1;0.5;1" dur="0.8s" repeatCount="indefinite" />
+      </path>
+      {/* Triangle fill */}
+      <path d="M100 30 L170 155 L30 155 Z" fill="#ff0020" fillOpacity="0.04" />
+
+      {/* Exclamation mark */}
+      <line x1="100" y1="70" x2="100" y2="115" stroke="#ff0020" strokeWidth="6" strokeLinecap="round">
+        <animate attributeName="stroke-opacity" values="1;0.4;1" dur="0.6s" repeatCount="indefinite" />
+      </line>
+      <circle cx="100" cy="135" r="4" fill="#ff0020">
+        <animate attributeName="opacity" values="1;0.4;1" dur="0.6s" repeatCount="indefinite" />
+      </circle>
+
+      {/* WARNING text */}
+      <text x="100" y="182" textAnchor="middle" fontSize="11" fontFamily="Orbitron, monospace" fontWeight="bold" fill="#ff0020" letterSpacing="5">
+        <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
+        WARNING
+      </text>
+
+      {/* Corner markers */}
+      {[
+      [10, 10, 25, 10, 10, 25],
+      [190, 10, 175, 10, 190, 25],
+      [10, 190, 25, 190, 10, 175],
+      [190, 190, 175, 190, 190, 175]].
+      map(([x1, y1, x2, y2, x3, y3], i) =>
+      <g key={i}>
+          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ff0020" strokeWidth="1" strokeOpacity="0.3" />
+          <line x1={x1} y1={y1} x2={x3} y2={y3} stroke="#ff0020" strokeWidth="1" strokeOpacity="0.3" />
+        </g>
+      )}
+    </svg>);
+
+}
+
+// ── Component ──
+function EmergencyButton() {
+  const [active, setActive] = useState(false);
+  const savedThemeRef = useRef<Record<string, string>>({});
+  const sirenRef = useRef<SirenNodes | null>(null);
+  const shakeRef = useRef<gsap.core.Timeline | null>(null);
+  const [flash, setFlash] = useState(false);
+
+  const activate = useCallback(() => {
+    if (active) return;
+
+    // Save & override theme
+    savedThemeRef.current = saveTheme();
+    applyRedTheme();
+
+    // White flash
+    setFlash(true);
+    setTimeout(() => setFlash(false), 120);
+
+    // Shake UI
+    shakeRef.current = shakeUI();
+
+    // Siren
+    sirenRef.current = createSiren();
+
+    setActive(true);
+  }, [active]);
+
+  const deactivate = useCallback(() => {
+    if (!active) return;
+
+    // Restore theme
+    restoreTheme(savedThemeRef.current);
+
+    // Stop siren
+    sirenRef.current?.stop();
+    sirenRef.current = null;
+
+    // Kill residual shake
+    shakeRef.current?.kill();
+    const root = document.getElementById('root');
+    if (root) gsap.set(root, { clearProps: 'x,y,rotation' });
+
+    setActive(false);
+  }, [active]);
+
+  // Toggle handler for the button
+  const toggle = useCallback(() => {
+    if (active) deactivate();
+    else activate();
+  }, [active, activate, deactivate]);
+
+  // Keyboard shortcut: M to deactivate
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'm' || e.key === 'M') {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (active) deactivate();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active, deactivate]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      sirenRef.current?.stop();
+      shakeRef.current?.kill();
+      const root = document.getElementById('root');
+      if (root) gsap.set(root, { clearProps: 'x,y,rotation' });
+    };
+  }, []);
+
+  return (
+    <>
+      {/* Trigger button — now toggles on/off */}
+      <motion.button
+        onClick={toggle}
+        className={`fixed top-5 right-16 lg:right-16 z-[94] w-10 h-10 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
+        active ?
+        'bg-red-500/20 border-red-500/40 text-red-400 shadow-lg shadow-red-500/25' :
+        'bg-white/[0.03] border-white/[0.07] text-white/50 hover:text-red-400 hover:border-red-500/25 hover:bg-red-500/[0.06]'}`
+        }
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.9 }}
+        title="Emergency Alert">
+
+        <ShieldAlert className="w-4 h-4" />
+      </motion.button>
+
+      {/* White flash overlay */}
+      <AnimatePresence>
+        {flash &&
+        <motion.div
+          className="fixed inset-0 z-[200] bg-white pointer-events-none"
+          initial={{ opacity: 0.9 }}
+          animate={{ opacity: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }} />
+
+        }
+      </AnimatePresence>
+
+      {/* Emergency overlay */}
+      <AnimatePresence>
+        {active &&
+        <>
+            {/* Red vignette + scan effects */}
+            <motion.div
+            className="fixed inset-0 z-[95] pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}>
+
+              {/* Radial red vignette */}
+              <div
+            className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(255,0,20,0.1) 60%, rgba(255,0,20,0.22) 100%)'
+            }} />
+
+
+              {/* Pulsing red flash */}
+              <motion.div
+              className="absolute inset-0 bg-red-600/[0.06]"
+              animate={{ opacity: [0, 0.08, 0, 0.04, 0] }}
+              transition={{ duration: 1.2, repeat: Infinity }} />
+
+
+              {/* Scan line */}
+              <motion.div
+              className="absolute left-0 right-0 h-px"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(255,0,20,0.5), transparent)',
+                boxShadow: '0 0 20px rgba(255,0,20,0.3)'
+              }}
+              animate={{ top: ['0%', '100%'] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }} />
+
+
+              {/* CRT scanlines */}
+              <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,20,0.15) 2px, rgba(255,0,20,0.15) 4px)'
+            }} />
+
+
+              {/* Pulsing red border */}
+              <motion.div
+              className="absolute inset-2 rounded-xl pointer-events-none"
+              style={{ border: '1px solid rgba(255,0,20,0.15)' }}
+              animate={{ borderColor: ['rgba(255,0,20,0.15)', 'rgba(255,0,20,0.4)', 'rgba(255,0,20,0.15)'] }}
+              transition={{ duration: 1.5, repeat: Infinity }} />
+
+
+              {/* Corner brackets */}
+              {[
+            { top: 8, left: 8 },
+            { top: 8, right: 8 },
+            { bottom: 8, left: 8 },
+            { bottom: 8, right: 8 }].
+            map((pos, i) =>
+            <motion.div
+              key={i}
+              className="absolute w-6 h-6 sm:w-10 sm:h-10"
+              style={{
+                ...pos,
+                borderTop: 'top' in pos ? '2px solid rgba(255,0,20,0.5)' : 'none',
+                borderBottom: 'bottom' in pos ? '2px solid rgba(255,0,20,0.5)' : 'none',
+                borderLeft: 'left' in pos && !('right' in pos) ? '2px solid rgba(255,0,20,0.5)' : 'none',
+                borderRight: 'right' in pos && !('left' in pos) ? '2px solid rgba(255,0,20,0.5)' : 'none'
+              } as React.CSSProperties}
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }} />
+
+            )}
+            </motion.div>
+
+            {/* Centre warning symbol */}
+            <motion.div
+            className="fixed inset-0 z-[96] flex items-center justify-center pointer-events-none"
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ type: 'spring', stiffness: 250, damping: 18, delay: 0.15 }}>
+
+              <div className="w-40 h-40 sm:w-56 sm:h-56">
+                <WarningSVG />
+              </div>
+            </motion.div>
+
+            {/* Top HUD bar */}
+            <motion.div
+            className="fixed top-14 lg:top-4 left-4 right-4 lg:left-24 z-[97] pointer-events-none"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ delay: 0.2 }}>
+
+              <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-red-950/50 backdrop-blur-md border border-red-500/25">
+                <div className="flex items-center gap-2.5">
+                  <motion.div
+                  animate={{ opacity: [1, 0.2, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}>
+
+                    <ShieldAlert className="w-4 h-4 text-red-500" />
+                  </motion.div>
+                  <motion.span
+                  className="text-[10px] sm:text-xs font-display tracking-[0.2em] text-red-400 font-bold"
+                  animate={{ opacity: [1, 0.5, 1] }}
+                  transition={{ duration: 0.8, repeat: Infinity }}>
+
+                    ⚠ EMERGENCY PROTOCOL ACTIVE
+                  </motion.span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <motion.div
+                  className="w-2 h-2 rounded-full bg-red-500"
+                  animate={{ opacity: [1, 0.2, 1], scale: [1, 1.4, 1] }}
+                  transition={{ duration: 0.6, repeat: Infinity }} />
+
+                </div>
+              </div>
+            </motion.div>
+
+            {/* STAND DOWN button */}
+            <motion.div
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[97]"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ delay: 0.5 }}>
+
+              <motion.button
+              onClick={deactivate}
+              className="px-8 py-3 rounded-xl bg-red-950/60 backdrop-blur-md border border-red-500/30 text-red-300 font-display text-sm font-bold tracking-[0.2em] cursor-pointer"
+              whileHover={{ scale: 1.05, borderColor: 'rgba(255,0,20,0.6)' }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ boxShadow: ['0 0 0px rgba(255,0,20,0)', '0 0 25px rgba(255,0,20,0.2)', '0 0 0px rgba(255,0,20,0)'] }}
+              transition={{ duration: 2, repeat: Infinity }}>
+
+                ■ STAND DOWN
+              </motion.button>
+            </motion.div>
+          </>
+        }
+      </AnimatePresence>
+    </>);
+
+}
+
+export default memo(EmergencyButton);

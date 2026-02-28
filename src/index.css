@@ -1,1 +1,5 @@
-{"path":"src/index.css","content":"@layer theme, base, components, utilities;\n\n@import 'tailwindcss';\n\n@import './theme.css' layer(theme);\n","encoding":"utf8"}
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss';
+
+@import './theme.css' layer(theme);

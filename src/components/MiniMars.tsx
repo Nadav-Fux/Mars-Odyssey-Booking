@@ -1,1 +1,119 @@
-{"path":"src/components/MiniMars.tsx","content":"import { memo } from 'react';\nimport { useBatterySaver } from '@/hooks/useBatterySaver';\nimport marsTexture from '@/assets/generated/mars-texture.webp';\n\n/**\n * MiniMars\n *\n * A small, proportional rotating Mars sphere for inline use.\n * Stronger 3D lighting overlays than RealisticMars to compensate\n * for the small size — ensures no washed-out / white areas.\n */\n\ninterface MiniMarsProps {\n  size?: number;\n  className?: string;\n}\n\nconst miniCSS = `\n@keyframes mini-mars-rotate {\n  from { background-position-x: 0; }\n  to   { background-position-x: -300%; }\n}\n.battery-saver .mini-mars-surface {\n  animation-play-state: paused !important;\n}\n`;\n\nfunction MiniMars({ size = 80, className = '' }: MiniMarsProps) {\n  const { isSaving } = useBatterySaver();\n\n  return (\n    <>\n      <style dangerouslySetInnerHTML={{ __html: miniCSS }} />\n      <div\n      className={`relative shrink-0 ${className}`}\n      style={{ width: size, height: size }}\n      role=\"img\"\n      aria-label=\"Small rotating Mars\">\n\n        {/* Soft outer glow */}\n        {!isSaving &&\n        <div\n        className=\"absolute inset-[-20%] rounded-full pointer-events-none\"\n        style={{\n          background:\n          'radial-gradient(circle, rgba(255,69,0,0.08) 30%, transparent 65%)',\n          filter: 'blur(4px)'\n        }} />\n\n        }\n\n        {/* Globe */}\n        <div\n        className=\"absolute inset-0 rounded-full overflow-hidden\"\n        style={{ boxShadow: '0 0 15px rgba(255,69,0,0.08)' }}>\n\n          {/* Texture — slightly darkened with brightness filter */}\n          <div\n          className=\"mini-mars-surface absolute inset-0\"\n          style={{\n            backgroundImage: `url(${marsTexture})`,\n            backgroundSize: '300% 100%',\n            backgroundRepeat: 'repeat-x',\n            backgroundPosition: '0 center',\n            animation: isSaving ? 'none' : 'mini-mars-rotate 40s linear infinite',\n            filter: 'brightness(0.75) saturate(1.2)'\n          }} />\n\n\n          {/* Terminator shadow — stronger for small size */}\n          <div\n          className=\"absolute inset-0\"\n          style={{\n            background:\n            'linear-gradient(105deg, rgba(0,0,0,0.15) 0%, transparent 15%, transparent 35%, rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.6) 58%, rgba(0,0,0,0.92) 75%)'\n          }} />\n\n\n          {/* Specular highlight — very subtle, warm tint only */}\n          <div\n          className=\"absolute inset-0\"\n          style={{\n            background:\n            'radial-gradient(ellipse 35% 30% at 30% 30%, rgba(255,180,140,0.06) 0%, transparent 60%)'\n          }} />\n\n\n          {/* Limb darkening — aggressive */}\n          <div\n          className=\"absolute inset-0\"\n          style={{\n            background:\n            'radial-gradient(circle at 40% 45%, transparent 28%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0.7) 65%, rgba(0,0,0,0.95) 85%)'\n          }} />\n\n\n          {/* Atmosphere rim — warm orange at edge */}\n          <div\n          className=\"absolute inset-0\"\n          style={{\n            background:\n            'radial-gradient(circle at 40% 45%, transparent 45%, rgba(255,60,10,0.06) 60%, rgba(200,40,0,0.08) 75%, rgba(100,20,0,0.04) 100%)'\n          }} />\n\n        </div>\n\n        {/* Edge shadow */}\n        <div\n        className=\"absolute inset-0 rounded-full pointer-events-none\"\n        style={{\n          boxShadow: 'inset -3px -2px 10px rgba(0,0,0,0.5)'\n        }} />\n\n      </div>\n    </>);\n\n}\n\nexport default memo(MiniMars);","encoding":"utf8"}
+import { memo } from 'react';
+import { useBatterySaver } from '@/hooks/useBatterySaver';
+import marsTexture from '@/assets/generated/mars-texture.webp';
+
+/**
+ * MiniMars
+ *
+ * A small, proportional rotating Mars sphere for inline use.
+ * Stronger 3D lighting overlays than RealisticMars to compensate
+ * for the small size — ensures no washed-out / white areas.
+ */
+
+interface MiniMarsProps {
+  size?: number;
+  className?: string;
+}
+
+const miniCSS = `
+@keyframes mini-mars-rotate {
+  from { background-position-x: 0; }
+  to   { background-position-x: -300%; }
+}
+.battery-saver .mini-mars-surface {
+  animation-play-state: paused !important;
+}
+`;
+
+function MiniMars({ size = 80, className = '' }: MiniMarsProps) {
+  const { isSaving } = useBatterySaver();
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: miniCSS }} />
+      <div
+      className={`relative shrink-0 ${className}`}
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label="Small rotating Mars">
+
+        {/* Soft outer glow */}
+        {!isSaving &&
+        <div
+        className="absolute inset-[-20%] rounded-full pointer-events-none"
+        style={{
+          background:
+          'radial-gradient(circle, rgba(255,69,0,0.08) 30%, transparent 65%)',
+          filter: 'blur(4px)'
+        }} />
+
+        }
+
+        {/* Globe */}
+        <div
+        className="absolute inset-0 rounded-full overflow-hidden"
+        style={{ boxShadow: '0 0 15px rgba(255,69,0,0.08)' }}>
+
+          {/* Texture — slightly darkened with brightness filter */}
+          <div
+          className="mini-mars-surface absolute inset-0"
+          style={{
+            backgroundImage: `url(${marsTexture})`,
+            backgroundSize: '300% 100%',
+            backgroundRepeat: 'repeat-x',
+            backgroundPosition: '0 center',
+            animation: isSaving ? 'none' : 'mini-mars-rotate 40s linear infinite',
+            filter: 'brightness(0.75) saturate(1.2)'
+          }} />
+
+
+          {/* Terminator shadow — stronger for small size */}
+          <div
+          className="absolute inset-0"
+          style={{
+            background:
+            'linear-gradient(105deg, rgba(0,0,0,0.15) 0%, transparent 15%, transparent 35%, rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.6) 58%, rgba(0,0,0,0.92) 75%)'
+          }} />
+
+
+          {/* Specular highlight — very subtle, warm tint only */}
+          <div
+          className="absolute inset-0"
+          style={{
+            background:
+            'radial-gradient(ellipse 35% 30% at 30% 30%, rgba(255,180,140,0.06) 0%, transparent 60%)'
+          }} />
+
+
+          {/* Limb darkening — aggressive */}
+          <div
+          className="absolute inset-0"
+          style={{
+            background:
+            'radial-gradient(circle at 40% 45%, transparent 28%, rgba(0,0,0,0.35) 48%, rgba(0,0,0,0.7) 65%, rgba(0,0,0,0.95) 85%)'
+          }} />
+
+
+          {/* Atmosphere rim — warm orange at edge */}
+          <div
+          className="absolute inset-0"
+          style={{
+            background:
+            'radial-gradient(circle at 40% 45%, transparent 45%, rgba(255,60,10,0.06) 60%, rgba(200,40,0,0.08) 75%, rgba(100,20,0,0.04) 100%)'
+          }} />
+
+        </div>
+
+        {/* Edge shadow */}
+        <div
+        className="absolute inset-0 rounded-full pointer-events-none"
+        style={{
+          boxShadow: 'inset -3px -2px 10px rgba(0,0,0,0.5)'
+        }} />
+
+      </div>
+    </>);
+
+}
+
+export default memo(MiniMars);

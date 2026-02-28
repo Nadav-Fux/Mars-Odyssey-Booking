@@ -1,1 +1,535 @@
-{"path":"src/components/WindowToMars.tsx","content":"import { useRef, useState, useEffect, useCallback, memo } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useGSAP } from '@gsap/react';\nimport { gsap } from '@/lib/gsap';\nimport { ScanEye, Crosshair } from 'lucide-react';\nimport RevealText from '@/components/RevealText';\n\n/* ================================================================\n   WINDOW TO MARS  —  Interactive Porthole Lens\n\n   A circular spaceship-porthole frame.  On hover the interior\n   swaps from a dim, hazy view to a vivid, detailed Mars\n   landscape rendered on a <canvas>, with:\n\n     • Parallax movement that tracks the mouse cursor\n     • Multi-layer terrain (sky → mountains → dunes → foreground)\n     • Floating dust particles\n     • Atmospheric rim glow\n     • HUD overlay data readout\n   ================================================================ */\n\n// ── Constants ──\nconst SIZE = 480; // canvas resolution\nconst HALF = SIZE / 2;\nconst PARALLAX_RANGE = 25; // px max shift per layer\n\n// ── Colour palette ──\nconst C = {\n  sky1: '#1a0a04',\n  sky2: '#3d1508',\n  sky3: '#7a2e12',\n  sun: '#ff8c42',\n  mtn1: '#2a0f06',\n  mtn2: '#3b1a0a',\n  dune1: '#6b3018',\n  dune2: '#8b4422',\n  dune3: '#a35530',\n  fg: '#4a2010',\n  dust: '#ffb888',\n  atmo: '#ff6b35'\n};\n\n// ── Dust particle ──\ninterface Mote {\n  x: number;y: number;r: number;vx: number;vy: number;o: number;\n}\n\n// ── Draw the full Mars landscape into a canvas context ──\nfunction drawMars(\nctx: CanvasRenderingContext2D,\nw: number,\nh: number,\nox: number, // parallax offset x (-1 … 1)\noy: number, // parallax offset y (-1 … 1)\nintensity: number, // 0 = dim, 1 = vivid\nmotes: Mote[])\n{\n  const cx = w / 2;\n  const cy = h / 2;\n\n  ctx.save();\n  ctx.clearRect(0, 0, w, h);\n\n  // --- Background circle clip (not needed if canvas is circular via CSS) ---\n  ctx.beginPath();\n  ctx.arc(cx, cy, cx, 0, Math.PI * 2);\n  ctx.clip();\n\n  // ── Layer 0: Sky gradient (deepest, least parallax) ──\n  const px0 = ox * PARALLAX_RANGE * 0.15;\n  const py0 = oy * PARALLAX_RANGE * 0.15;\n  const skyG = ctx.createLinearGradient(cx + px0, 0 + py0, cx + px0, h + py0);\n  skyG.addColorStop(0, C.sky1);\n  skyG.addColorStop(0.35, C.sky2);\n  skyG.addColorStop(0.6, C.sky3);\n  skyG.addColorStop(1, C.dune1);\n  ctx.fillStyle = skyG;\n  ctx.fillRect(0, 0, w, h);\n\n  // ── Sun / haze glow ──\n  const sunX = cx * 0.7 + px0 * 3;\n  const sunY = cy * 0.38 + py0 * 2;\n  const sunR = 60 + intensity * 30;\n  const sunG = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);\n  sunG.addColorStop(0, `rgba(255,140,66,${0.25 + intensity * 0.45})`);\n  sunG.addColorStop(0.5, `rgba(255,100,30,${0.08 + intensity * 0.12})`);\n  sunG.addColorStop(1, 'rgba(255,100,30,0)');\n  ctx.fillStyle = sunG;\n  ctx.fillRect(0, 0, w, h);\n\n  // ── Layer 1: Distant mountains ──\n  const px1 = ox * PARALLAX_RANGE * 0.35;\n  const py1 = oy * PARALLAX_RANGE * 0.25;\n  ctx.save();\n  ctx.translate(px1, py1);\n  ctx.beginPath();\n  ctx.moveTo(-20, h * 0.62);\n  ctx.lineTo(w * 0.08, h * 0.42);\n  ctx.lineTo(w * 0.18, h * 0.48);\n  ctx.lineTo(w * 0.30, h * 0.35);\n  ctx.lineTo(w * 0.42, h * 0.44);\n  ctx.lineTo(w * 0.52, h * 0.38);\n  ctx.lineTo(w * 0.65, h * 0.43);\n  ctx.lineTo(w * 0.78, h * 0.33);\n  ctx.lineTo(w * 0.88, h * 0.40);\n  ctx.lineTo(w * 1.02, h * 0.37);\n  ctx.lineTo(w + 20, h * 0.62);\n  ctx.closePath();\n  ctx.fillStyle = C.mtn1;\n  ctx.globalAlpha = 0.7 + intensity * 0.3;\n  ctx.fill();\n  ctx.restore();\n\n  // ── Layer 2: Mid mountains ──\n  const px2 = ox * PARALLAX_RANGE * 0.55;\n  const py2 = oy * PARALLAX_RANGE * 0.4;\n  ctx.save();\n  ctx.translate(px2, py2);\n  ctx.beginPath();\n  ctx.moveTo(-20, h * 0.72);\n  ctx.lineTo(w * 0.05, h * 0.54);\n  ctx.lineTo(w * 0.15, h * 0.60);\n  ctx.lineTo(w * 0.28, h * 0.50);\n  ctx.lineTo(w * 0.40, h * 0.58);\n  ctx.lineTo(w * 0.50, h * 0.52);\n  ctx.lineTo(w * 0.62, h * 0.56);\n  ctx.lineTo(w * 0.75, h * 0.48);\n  ctx.lineTo(w * 0.85, h * 0.55);\n  ctx.lineTo(w * 0.95, h * 0.50);\n  ctx.lineTo(w + 20, h * 0.72);\n  ctx.closePath();\n  ctx.fillStyle = C.mtn2;\n  ctx.globalAlpha = 0.75 + intensity * 0.25;\n  ctx.fill();\n  ctx.restore();\n\n  // ── Layer 3: Sand dunes ──\n  const px3 = ox * PARALLAX_RANGE * 0.75;\n  const py3 = oy * PARALLAX_RANGE * 0.55;\n  ctx.save();\n  ctx.translate(px3, py3);\n  ctx.beginPath();\n  ctx.moveTo(-20, h);\n  ctx.lineTo(-20, h * 0.68);\n  ctx.quadraticCurveTo(w * 0.12, h * 0.60, w * 0.25, h * 0.65);\n  ctx.quadraticCurveTo(w * 0.38, h * 0.70, w * 0.50, h * 0.63);\n  ctx.quadraticCurveTo(w * 0.65, h * 0.56, w * 0.78, h * 0.62);\n  ctx.quadraticCurveTo(w * 0.90, h * 0.68, w + 20, h * 0.60);\n  ctx.lineTo(w + 20, h);\n  ctx.closePath();\n  const duneG = ctx.createLinearGradient(0, h * 0.55, 0, h);\n  duneG.addColorStop(0, C.dune1);\n  duneG.addColorStop(0.4, C.dune2);\n  duneG.addColorStop(1, C.dune3);\n  ctx.fillStyle = duneG;\n  ctx.globalAlpha = 0.8 + intensity * 0.2;\n  ctx.fill();\n  ctx.restore();\n\n  // ── Layer 4: Foreground rocks ──\n  const px4 = ox * PARALLAX_RANGE;\n  const py4 = oy * PARALLAX_RANGE * 0.7;\n  ctx.save();\n  ctx.translate(px4, py4);\n  ctx.globalAlpha = 0.6 + intensity * 0.4;\n  // Rock cluster left\n  ctx.beginPath();\n  ctx.moveTo(w * 0.05, h * 0.92);\n  ctx.lineTo(w * 0.08, h * 0.78);\n  ctx.lineTo(w * 0.14, h * 0.80);\n  ctx.lineTo(w * 0.18, h * 0.75);\n  ctx.lineTo(w * 0.24, h * 0.82);\n  ctx.lineTo(w * 0.28, h * 0.92);\n  ctx.closePath();\n  ctx.fillStyle = C.fg;\n  ctx.fill();\n  // Rock cluster right\n  ctx.beginPath();\n  ctx.moveTo(w * 0.72, h * 0.95);\n  ctx.lineTo(w * 0.76, h * 0.80);\n  ctx.lineTo(w * 0.82, h * 0.83);\n  ctx.lineTo(w * 0.88, h * 0.77);\n  ctx.lineTo(w * 0.94, h * 0.84);\n  ctx.lineTo(w * 0.98, h * 0.95);\n  ctx.closePath();\n  ctx.fill();\n  // Small scattered rocks\n  [[0.35, 0.88, 4], [0.45, 0.91, 3], [0.55, 0.87, 5], [0.65, 0.93, 3]].forEach(([rx, ry, rr]) => {\n    ctx.beginPath();\n    ctx.arc(w * rx, h * ry, rr as number, 0, Math.PI * 2);\n    ctx.fill();\n  });\n  ctx.restore();\n\n  // ── Dust motes ──\n  ctx.save();\n  for (const m of motes) {\n    m.x += m.vx;\n    m.y += m.vy;\n    if (m.x < -10) m.x = w + 10;\n    if (m.x > w + 10) m.x = -10;\n    if (m.y < -10) m.y = h + 10;\n    if (m.y > h + 10) m.y = -10;\n    ctx.beginPath();\n    ctx.arc(m.x + px3 * 0.5, m.y + py3 * 0.3, m.r, 0, Math.PI * 2);\n    ctx.fillStyle = C.dust;\n    ctx.globalAlpha = m.o * intensity;\n    ctx.fill();\n  }\n  ctx.restore();\n\n  // ── Atmospheric haze gradient at bottom ──\n  const hazeG = ctx.createLinearGradient(0, h * 0.85, 0, h);\n  hazeG.addColorStop(0, 'rgba(30,12,6,0)');\n  hazeG.addColorStop(1, `rgba(30,12,6,${0.3 + intensity * 0.2})`);\n  ctx.fillStyle = hazeG;\n  ctx.globalAlpha = 1;\n  ctx.fillRect(0, 0, w, h);\n\n  // ── Vignette ──\n  const vigG = ctx.createRadialGradient(cx, cy, cx * 0.5, cx, cy, cx);\n  vigG.addColorStop(0, 'rgba(0,0,0,0)');\n  vigG.addColorStop(0.7, 'rgba(0,0,0,0)');\n  vigG.addColorStop(1, `rgba(0,0,0,${0.5 + (1 - intensity) * 0.35})`);\n  ctx.fillStyle = vigG;\n  ctx.fillRect(0, 0, w, h);\n\n  ctx.restore();\n}\n\n// ── Generate initial dust motes ──\nfunction createMotes(count: number, w: number, h: number): Mote[] {\n  return Array.from({ length: count }, () => ({\n    x: Math.random() * w,\n    y: Math.random() * h,\n    r: 0.5 + Math.random() * 1.8,\n    vx: 0.15 + Math.random() * 0.4,\n    vy: -0.05 + Math.random() * 0.1,\n    o: 0.15 + Math.random() * 0.35\n  }));\n}\n\n// ── Porthole frame SVG ring ──\nfunction PortholeFrame({ hovered }: {hovered: boolean;}) {\n  return (\n    <svg viewBox=\"0 0 500 500\" className=\"absolute inset-0 w-full h-full z-10 pointer-events-none\" fill=\"none\">\n      <defs>\n        <radialGradient id=\"wtm-rim\" cx=\"50%\" cy=\"50%\" r=\"50%\">\n          <stop offset=\"88%\" stopColor=\"transparent\" />\n          <stop offset=\"92%\" stopColor=\"rgba(255,69,0,0.06)\" />\n          <stop offset=\"100%\" stopColor=\"rgba(255,69,0,0.02)\" />\n        </radialGradient>\n        <filter id=\"wtm-glow\"><feGaussianBlur stdDeviation=\"4\" /><feMerge><feMergeNode /><feMergeNode in=\"SourceGraphic\" /></feMerge></filter>\n      </defs>\n\n      {/* Outer chrome ring */}\n      <circle cx=\"250\" cy=\"250\" r=\"235\" stroke=\"#FF4500\" strokeWidth=\"2\" strokeOpacity=\"0.25\" />\n      <circle cx=\"250\" cy=\"250\" r=\"240\" stroke=\"white\" strokeWidth=\"0.5\" strokeOpacity=\"0.05\" />\n\n      {/* Thick frame ring */}\n      <circle cx=\"250\" cy=\"250\" r=\"230\" stroke=\"#3a1a0c\" strokeWidth=\"14\" strokeOpacity=\"0.6\" />\n      <circle cx=\"250\" cy=\"250\" r=\"230\" stroke=\"#FF4500\" strokeWidth=\"0.8\" strokeOpacity=\"0.15\" />\n\n      {/* Inner bevel */}\n      <circle cx=\"250\" cy=\"250\" r=\"222\" stroke=\"white\" strokeWidth=\"0.5\" strokeOpacity=\"0.04\" />\n      <circle cx=\"250\" cy=\"250\" r=\"224\" stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.1\" />\n\n      {/* Bolts around the frame */}\n      {Array.from({ length: 16 }, (_, i) => {\n        const a = i / 16 * Math.PI * 2 - Math.PI / 2;\n        const r = 230;\n        const bx = 250 + Math.cos(a) * r;\n        const by = 250 + Math.sin(a) * r;\n        return (\n          <g key={i}>\n            <circle cx={bx} cy={by} r=\"4\" fill=\"#1a0a05\" stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n            <circle cx={bx} cy={by} r=\"1.5\" fill=\"#FF4500\" fillOpacity=\"0.15\" />\n          </g>);\n\n      })}\n\n      {/* Rim light on hover */}\n      <circle\n      cx=\"250\" cy=\"250\" r=\"223\"\n      stroke=\"#FF4500\" strokeWidth=\"2\"\n      strokeOpacity={hovered ? 0.35 : 0}\n      filter=\"url(#wtm-glow)\"\n      style={{ transition: 'stroke-opacity 0.6s ease' }} />\n\n\n      {/* Inner radial fill */}\n      <circle cx=\"250\" cy=\"250\" r=\"222\" fill=\"url(#wtm-rim)\" />\n\n      {/* Section markers (N/S/E/W) */}\n      {[0, 90, 180, 270].map((deg) => {\n        const a = (deg - 90) * Math.PI / 180;\n        const r1 = 236;\n        const r2 = 244;\n        return (\n          <line\n          key={deg}\n          x1={250 + Math.cos(a) * r1} y1={250 + Math.sin(a) * r1}\n          x2={250 + Math.cos(a) * r2} y2={250 + Math.sin(a) * r2}\n          stroke=\"#FF4500\" strokeWidth=\"1.5\" strokeOpacity=\"0.2\" />);\n\n\n      })}\n\n      {/* Mini ticks */}\n      {Array.from({ length: 36 }, (_, i) => {\n        if (i % 9 === 0) return null;\n        const a = i / 36 * Math.PI * 2 - Math.PI / 2;\n        const r1 = 238;\n        const r2 = 242;\n        return (\n          <line\n          key={`t-${i}`}\n          x1={250 + Math.cos(a) * r1} y1={250 + Math.sin(a) * r1}\n          x2={250 + Math.cos(a) * r2} y2={250 + Math.sin(a) * r2}\n          stroke=\"#FF4500\" strokeWidth=\"0.4\" strokeOpacity=\"0.1\" />);\n\n\n      })}\n    </svg>);\n\n}\n\n// ── HUD overlay shown on hover ──\nfunction LensHUD() {\n  return (\n    <div className=\"absolute inset-0 z-20 pointer-events-none\">\n      {/* Top-left readout */}\n      <div className=\"absolute top-[18%] left-[15%]\">\n        <div className=\"text-[7px] font-display tracking-[0.15em] text-primary/40\">VIEWPORT</div>\n        <div className=\"text-[9px] font-display tracking-[0.1em] text-white/40 font-bold\">OLYMPUS MONS</div>\n      </div>\n      {/* Top-right coordinates */}\n      <div className=\"absolute top-[18%] right-[15%] text-right\">\n        <div className=\"text-[7px] font-display tracking-[0.1em] text-primary/30\">18.65°N 226.2°E</div>\n        <div className=\"text-[7px] font-display tracking-[0.1em] text-primary/30\">ALT 21,229m</div>\n      </div>\n      {/* Bottom data */}\n      <div className=\"absolute bottom-[16%] left-1/2 -translate-x-1/2 flex gap-6\">\n        {[\n        { label: 'TEMP', value: '-63°C' },\n        { label: 'WIND', value: '12 m/s' },\n        { label: 'VIS', value: '8.4 km' }].\n        map((d) =>\n        <div key={d.label} className=\"text-center\">\n            <div className=\"text-[6px] font-display tracking-[0.15em] text-white/50\">{d.label}</div>\n            <div className=\"text-[9px] font-display text-primary/50 font-bold tabular-nums\">{d.value}</div>\n          </div>\n        )}\n      </div>\n      {/* Center crosshair */}\n      <svg viewBox=\"0 0 100 100\" className=\"absolute inset-0 w-full h-full\">\n        <line x1=\"46\" y1=\"50\" x2=\"40\" y2=\"50\" stroke=\"#FF4500\" strokeWidth=\"0.3\" strokeOpacity=\"0.2\" />\n        <line x1=\"54\" y1=\"50\" x2=\"60\" y2=\"50\" stroke=\"#FF4500\" strokeWidth=\"0.3\" strokeOpacity=\"0.2\" />\n        <line x1=\"50\" y1=\"46\" x2=\"50\" y2=\"40\" stroke=\"#FF4500\" strokeWidth=\"0.3\" strokeOpacity=\"0.2\" />\n        <line x1=\"50\" y1=\"54\" x2=\"50\" y2=\"60\" stroke=\"#FF4500\" strokeWidth=\"0.3\" strokeOpacity=\"0.2\" />\n        <circle cx=\"50\" cy=\"50\" r=\"5\" stroke=\"#FF4500\" strokeWidth=\"0.2\" strokeOpacity=\"0.1\" fill=\"none\" />\n      </svg>\n    </div>);\n\n}\n\n// ── Main component ──\nfunction WindowToMars() {\n  const sectionRef = useRef<HTMLDivElement>(null);\n  const canvasRef = useRef<HTMLCanvasElement>(null);\n  const frameRef = useRef(0);\n  const motesRef = useRef<Mote[]>(createMotes(35, SIZE, SIZE));\n  const mouseRef = useRef({ x: 0, y: 0 });\n  const intensityRef = useRef(0.15);\n  const targetIntensity = useRef(0.15);\n  const [hovered, setHovered] = useState(false);\n\n  // Animation loop\n  useEffect(() => {\n    const canvas = canvasRef.current;\n    if (!canvas) return;\n    const ctx = canvas.getContext('2d');\n    if (!ctx) return;\n\n    let running = true;\n    const loop = () => {\n      if (!running) return;\n      // Ease intensity\n      intensityRef.current += (targetIntensity.current - intensityRef.current) * 0.06;\n      drawMars(\n        ctx, SIZE, SIZE,\n        mouseRef.current.x, mouseRef.current.y,\n        intensityRef.current,\n        motesRef.current\n      );\n      frameRef.current = requestAnimationFrame(loop);\n    };\n    frameRef.current = requestAnimationFrame(loop);\n    return () => {running = false;cancelAnimationFrame(frameRef.current);};\n  }, []);\n\n  // Hover state drives intensity\n  useEffect(() => {\n    targetIntensity.current = hovered ? 1 : 0.15;\n  }, [hovered]);\n\n  const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {\n    const rect = e.currentTarget.getBoundingClientRect();\n    const nx = ((e.clientX - rect.left) / rect.width - 0.5) * 2; // -1…1\n    const ny = ((e.clientY - rect.top) / rect.height - 0.5) * 2;\n    mouseRef.current.x = nx;\n    mouseRef.current.y = ny;\n  }, []);\n\n  const onMouseLeave = useCallback(() => {\n    setHovered(false);\n    // Ease mouse back to center\n    const ease = () => {\n      mouseRef.current.x *= 0.9;\n      mouseRef.current.y *= 0.9;\n      if (Math.abs(mouseRef.current.x) > 0.01) requestAnimationFrame(ease);else\n      {mouseRef.current.x = 0;mouseRef.current.y = 0;}\n    };\n    requestAnimationFrame(ease);\n  }, []);\n\n  // Section entry animation\n  useGSAP(() => {\n    gsap.from('.wtm-head', {\n      y: 40, opacity: 0, stagger: 0.1, duration: 0.8,\n      scrollTrigger: { trigger: '.wtm-header', start: 'top 85%', once: true }\n    });\n    gsap.from('.wtm-porthole', {\n      scale: 0.85, opacity: 0, duration: 1.2, ease: 'expo.out',\n      scrollTrigger: { trigger: '.wtm-porthole', start: 'top 85%', once: true }\n    });\n  }, { scope: sectionRef });\n\n  return (\n    <section id=\"viewport\" ref={sectionRef} className=\"relative z-10 py-20 sm:py-28 px-4 sm:px-6\">\n      <div className=\"max-w-5xl mx-auto lg:pl-10\">\n        {/* Header */}\n        <div className=\"wtm-header mb-10 sm:mb-14 text-center\">\n          <span className=\"wtm-head inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/15 bg-primary/[0.04] mb-4\">\n            <ScanEye className=\"w-3 h-3 text-primary\" />\n            <span className=\"text-[10px] font-display tracking-[0.2em] text-primary/70\">OBSERVATION DECK</span>\n          </span>\n\n          <h2 className=\"wtm-head font-display text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-[1.1] mb-4\">\n            WINDOW TO{' '}\n            <span className=\"text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent\">MARS</span>\n          </h2>\n\n          <RevealText\n            text=\"Hover over the porthole to engage the observation lens. Move your cursor to pan across the Martian terrain.\"\n            className=\"wtm-head text-white/30 text-sm sm:text-base max-w-lg mx-auto leading-relaxed\" />\n\n        </div>\n\n        {/* Porthole */}\n        <div className=\"flex justify-center\">\n          <div\n          className=\"wtm-porthole relative cursor-crosshair\"\n          style={{ width: 'min(80vw, 420px)', aspectRatio: '1' }}\n          onMouseEnter={() => setHovered(true)}\n          onMouseMove={onMouseMove}\n          onMouseLeave={onMouseLeave}>\n\n            {/* Canvas scene (clipped to circle) */}\n            <canvas\n            ref={canvasRef}\n            width={SIZE}\n            height={SIZE}\n            className=\"absolute inset-0 w-full h-full rounded-full\"\n            style={{ clipPath: 'circle(44.5% at 50% 50%)' }} />\n\n\n            {/* Atmospheric rim glow on hover */}\n            <div\n            className=\"absolute inset-0 rounded-full pointer-events-none transition-opacity duration-700\"\n            style={{\n              opacity: hovered ? 1 : 0,\n              boxShadow: `inset 0 0 60px 10px rgba(255,107,53,0.12), 0 0 80px 20px rgba(255,69,0,0.06)`\n            }} />\n\n\n            {/* HUD overlay on hover */}\n            <AnimatePresence>\n              {hovered &&\n              <motion.div\n                initial={{ opacity: 0 }}\n                animate={{ opacity: 1 }}\n                exit={{ opacity: 0 }}\n                transition={{ duration: 0.5, ease: EXPO_OUT }}\n                className=\"absolute inset-0\"\n                style={{ clipPath: 'circle(44.5% at 50% 50%)' }}>\n\n                  <LensHUD />\n                </motion.div>\n              }\n            </AnimatePresence>\n\n            {/* Porthole frame ring (SVG) */}\n            <PortholeFrame hovered={hovered} />\n\n            {/* Status badge */}\n            <div className=\"absolute -bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 rounded-full\" style={{ background: 'rgba(8,8,18,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}>\n              <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-500 ${hovered ? 'bg-green-500' : 'bg-white/30'}`} />\n              <span className={`text-[8px] font-display tracking-[0.15em] transition-colors duration-500 ${hovered ? 'text-green-400/60' : 'text-white/50'}`}>\n                {hovered ? 'LENS ACTIVE' : 'HOVER TO OBSERVE'}\n              </span>\n            </div>\n          </div>\n        </div>\n\n        {/* Instruction + data */}\n        <div className=\"mt-8 flex items-center justify-center gap-6 flex-wrap\">\n          {[\n          { label: 'REGION', value: 'THARSIS PLATEAU' },\n          { label: 'ELEVATION', value: '21,229m' },\n          { label: 'ATMOSPHERE', value: '0.636 kPa' }].\n          map((d) =>\n          <div key={d.label} className=\"text-center\">\n              <div className=\"text-[7px] font-display tracking-[0.18em] text-white/50\">{d.label}</div>\n              <div className=\"text-[10px] font-display text-white/30 font-semibold\">{d.value}</div>\n            </div>\n          )}\n        </div>\n      </div>\n    </section>);\n\n}\n\nexport default memo(WindowToMars);","encoding":"utf8"}
+import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+import { useGSAP } from '@gsap/react';
+import { gsap } from '@/lib/gsap';
+import { ScanEye, Crosshair } from 'lucide-react';
+import RevealText from '@/components/RevealText';
+
+/* ================================================================
+   WINDOW TO MARS  —  Interactive Porthole Lens
+
+   A circular spaceship-porthole frame.  On hover the interior
+   swaps from a dim, hazy view to a vivid, detailed Mars
+   landscape rendered on a <canvas>, with:
+
+     • Parallax movement that tracks the mouse cursor
+     • Multi-layer terrain (sky → mountains → dunes → foreground)
+     • Floating dust particles
+     • Atmospheric rim glow
+     • HUD overlay data readout
+   ================================================================ */
+
+// ── Constants ──
+const SIZE = 480; // canvas resolution
+const HALF = SIZE / 2;
+const PARALLAX_RANGE = 25; // px max shift per layer
+
+// ── Colour palette ──
+const C = {
+  sky1: '#1a0a04',
+  sky2: '#3d1508',
+  sky3: '#7a2e12',
+  sun: '#ff8c42',
+  mtn1: '#2a0f06',
+  mtn2: '#3b1a0a',
+  dune1: '#6b3018',
+  dune2: '#8b4422',
+  dune3: '#a35530',
+  fg: '#4a2010',
+  dust: '#ffb888',
+  atmo: '#ff6b35'
+};
+
+// ── Dust particle ──
+interface Mote {
+  x: number;y: number;r: number;vx: number;vy: number;o: number;
+}
+
+// ── Draw the full Mars landscape into a canvas context ──
+function drawMars(
+ctx: CanvasRenderingContext2D,
+w: number,
+h: number,
+ox: number, // parallax offset x (-1 … 1)
+oy: number, // parallax offset y (-1 … 1)
+intensity: number, // 0 = dim, 1 = vivid
+motes: Mote[])
+{
+  const cx = w / 2;
+  const cy = h / 2;
+
+  ctx.save();
+  ctx.clearRect(0, 0, w, h);
+
+  // --- Background circle clip (not needed if canvas is circular via CSS) ---
+  ctx.beginPath();
+  ctx.arc(cx, cy, cx, 0, Math.PI * 2);
+  ctx.clip();
+
+  // ── Layer 0: Sky gradient (deepest, least parallax) ──
+  const px0 = ox * PARALLAX_RANGE * 0.15;
+  const py0 = oy * PARALLAX_RANGE * 0.15;
+  const skyG = ctx.createLinearGradient(cx + px0, 0 + py0, cx + px0, h + py0);
+  skyG.addColorStop(0, C.sky1);
+  skyG.addColorStop(0.35, C.sky2);
+  skyG.addColorStop(0.6, C.sky3);
+  skyG.addColorStop(1, C.dune1);
+  ctx.fillStyle = skyG;
+  ctx.fillRect(0, 0, w, h);
+
+  // ── Sun / haze glow ──
+  const sunX = cx * 0.7 + px0 * 3;
+  const sunY = cy * 0.38 + py0 * 2;
+  const sunR = 60 + intensity * 30;
+  const sunG = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+  sunG.addColorStop(0, `rgba(255,140,66,${0.25 + intensity * 0.45})`);
+  sunG.addColorStop(0.5, `rgba(255,100,30,${0.08 + intensity * 0.12})`);
+  sunG.addColorStop(1, 'rgba(255,100,30,0)');
+  ctx.fillStyle = sunG;
+  ctx.fillRect(0, 0, w, h);
+
+  // ── Layer 1: Distant mountains ──
+  const px1 = ox * PARALLAX_RANGE * 0.35;
+  const py1 = oy * PARALLAX_RANGE * 0.25;
+  ctx.save();
+  ctx.translate(px1, py1);
+  ctx.beginPath();
+  ctx.moveTo(-20, h * 0.62);
+  ctx.lineTo(w * 0.08, h * 0.42);
+  ctx.lineTo(w * 0.18, h * 0.48);
+  ctx.lineTo(w * 0.30, h * 0.35);
+  ctx.lineTo(w * 0.42, h * 0.44);
+  ctx.lineTo(w * 0.52, h * 0.38);
+  ctx.lineTo(w * 0.65, h * 0.43);
+  ctx.lineTo(w * 0.78, h * 0.33);
+  ctx.lineTo(w * 0.88, h * 0.40);
+  ctx.lineTo(w * 1.02, h * 0.37);
+  ctx.lineTo(w + 20, h * 0.62);
+  ctx.closePath();
+  ctx.fillStyle = C.mtn1;
+  ctx.globalAlpha = 0.7 + intensity * 0.3;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Layer 2: Mid mountains ──
+  const px2 = ox * PARALLAX_RANGE * 0.55;
+  const py2 = oy * PARALLAX_RANGE * 0.4;
+  ctx.save();
+  ctx.translate(px2, py2);
+  ctx.beginPath();
+  ctx.moveTo(-20, h * 0.72);
+  ctx.lineTo(w * 0.05, h * 0.54);
+  ctx.lineTo(w * 0.15, h * 0.60);
+  ctx.lineTo(w * 0.28, h * 0.50);
+  ctx.lineTo(w * 0.40, h * 0.58);
+  ctx.lineTo(w * 0.50, h * 0.52);
+  ctx.lineTo(w * 0.62, h * 0.56);
+  ctx.lineTo(w * 0.75, h * 0.48);
+  ctx.lineTo(w * 0.85, h * 0.55);
+  ctx.lineTo(w * 0.95, h * 0.50);
+  ctx.lineTo(w + 20, h * 0.72);
+  ctx.closePath();
+  ctx.fillStyle = C.mtn2;
+  ctx.globalAlpha = 0.75 + intensity * 0.25;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Layer 3: Sand dunes ──
+  const px3 = ox * PARALLAX_RANGE * 0.75;
+  const py3 = oy * PARALLAX_RANGE * 0.55;
+  ctx.save();
+  ctx.translate(px3, py3);
+  ctx.beginPath();
+  ctx.moveTo(-20, h);
+  ctx.lineTo(-20, h * 0.68);
+  ctx.quadraticCurveTo(w * 0.12, h * 0.60, w * 0.25, h * 0.65);
+  ctx.quadraticCurveTo(w * 0.38, h * 0.70, w * 0.50, h * 0.63);
+  ctx.quadraticCurveTo(w * 0.65, h * 0.56, w * 0.78, h * 0.62);
+  ctx.quadraticCurveTo(w * 0.90, h * 0.68, w + 20, h * 0.60);
+  ctx.lineTo(w + 20, h);
+  ctx.closePath();
+  const duneG = ctx.createLinearGradient(0, h * 0.55, 0, h);
+  duneG.addColorStop(0, C.dune1);
+  duneG.addColorStop(0.4, C.dune2);
+  duneG.addColorStop(1, C.dune3);
+  ctx.fillStyle = duneG;
+  ctx.globalAlpha = 0.8 + intensity * 0.2;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Layer 4: Foreground rocks ──
+  const px4 = ox * PARALLAX_RANGE;
+  const py4 = oy * PARALLAX_RANGE * 0.7;
+  ctx.save();
+  ctx.translate(px4, py4);
+  ctx.globalAlpha = 0.6 + intensity * 0.4;
+  // Rock cluster left
+  ctx.beginPath();
+  ctx.moveTo(w * 0.05, h * 0.92);
+  ctx.lineTo(w * 0.08, h * 0.78);
+  ctx.lineTo(w * 0.14, h * 0.80);
+  ctx.lineTo(w * 0.18, h * 0.75);
+  ctx.lineTo(w * 0.24, h * 0.82);
+  ctx.lineTo(w * 0.28, h * 0.92);
+  ctx.closePath();
+  ctx.fillStyle = C.fg;
+  ctx.fill();
+  // Rock cluster right
+  ctx.beginPath();
+  ctx.moveTo(w * 0.72, h * 0.95);
+  ctx.lineTo(w * 0.76, h * 0.80);
+  ctx.lineTo(w * 0.82, h * 0.83);
+  ctx.lineTo(w * 0.88, h * 0.77);
+  ctx.lineTo(w * 0.94, h * 0.84);
+  ctx.lineTo(w * 0.98, h * 0.95);
+  ctx.closePath();
+  ctx.fill();
+  // Small scattered rocks
+  [[0.35, 0.88, 4], [0.45, 0.91, 3], [0.55, 0.87, 5], [0.65, 0.93, 3]].forEach(([rx, ry, rr]) => {
+    ctx.beginPath();
+    ctx.arc(w * rx, h * ry, rr as number, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+
+  // ── Dust motes ──
+  ctx.save();
+  for (const m of motes) {
+    m.x += m.vx;
+    m.y += m.vy;
+    if (m.x < -10) m.x = w + 10;
+    if (m.x > w + 10) m.x = -10;
+    if (m.y < -10) m.y = h + 10;
+    if (m.y > h + 10) m.y = -10;
+    ctx.beginPath();
+    ctx.arc(m.x + px3 * 0.5, m.y + py3 * 0.3, m.r, 0, Math.PI * 2);
+    ctx.fillStyle = C.dust;
+    ctx.globalAlpha = m.o * intensity;
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // ── Atmospheric haze gradient at bottom ──
+  const hazeG = ctx.createLinearGradient(0, h * 0.85, 0, h);
+  hazeG.addColorStop(0, 'rgba(30,12,6,0)');
+  hazeG.addColorStop(1, `rgba(30,12,6,${0.3 + intensity * 0.2})`);
+  ctx.fillStyle = hazeG;
+  ctx.globalAlpha = 1;
+  ctx.fillRect(0, 0, w, h);
+
+  // ── Vignette ──
+  const vigG = ctx.createRadialGradient(cx, cy, cx * 0.5, cx, cy, cx);
+  vigG.addColorStop(0, 'rgba(0,0,0,0)');
+  vigG.addColorStop(0.7, 'rgba(0,0,0,0)');
+  vigG.addColorStop(1, `rgba(0,0,0,${0.5 + (1 - intensity) * 0.35})`);
+  ctx.fillStyle = vigG;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.restore();
+}
+
+// ── Generate initial dust motes ──
+function createMotes(count: number, w: number, h: number): Mote[] {
+  return Array.from({ length: count }, () => ({
+    x: Math.random() * w,
+    y: Math.random() * h,
+    r: 0.5 + Math.random() * 1.8,
+    vx: 0.15 + Math.random() * 0.4,
+    vy: -0.05 + Math.random() * 0.1,
+    o: 0.15 + Math.random() * 0.35
+  }));
+}
+
+// ── Porthole frame SVG ring ──
+function PortholeFrame({ hovered }: {hovered: boolean;}) {
+  return (
+    <svg viewBox="0 0 500 500" className="absolute inset-0 w-full h-full z-10 pointer-events-none" fill="none">
+      <defs>
+        <radialGradient id="wtm-rim" cx="50%" cy="50%" r="50%">
+          <stop offset="88%" stopColor="transparent" />
+          <stop offset="92%" stopColor="rgba(255,69,0,0.06)" />
+          <stop offset="100%" stopColor="rgba(255,69,0,0.02)" />
+        </radialGradient>
+        <filter id="wtm-glow"><feGaussianBlur stdDeviation="4" /><feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+      </defs>
+
+      {/* Outer chrome ring */}
+      <circle cx="250" cy="250" r="235" stroke="#FF4500" strokeWidth="2" strokeOpacity="0.25" />
+      <circle cx="250" cy="250" r="240" stroke="white" strokeWidth="0.5" strokeOpacity="0.05" />
+
+      {/* Thick frame ring */}
+      <circle cx="250" cy="250" r="230" stroke="#3a1a0c" strokeWidth="14" strokeOpacity="0.6" />
+      <circle cx="250" cy="250" r="230" stroke="#FF4500" strokeWidth="0.8" strokeOpacity="0.15" />
+
+      {/* Inner bevel */}
+      <circle cx="250" cy="250" r="222" stroke="white" strokeWidth="0.5" strokeOpacity="0.04" />
+      <circle cx="250" cy="250" r="224" stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.1" />
+
+      {/* Bolts around the frame */}
+      {Array.from({ length: 16 }, (_, i) => {
+        const a = i / 16 * Math.PI * 2 - Math.PI / 2;
+        const r = 230;
+        const bx = 250 + Math.cos(a) * r;
+        const by = 250 + Math.sin(a) * r;
+        return (
+          <g key={i}>
+            <circle cx={bx} cy={by} r="4" fill="#1a0a05" stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.2" />
+            <circle cx={bx} cy={by} r="1.5" fill="#FF4500" fillOpacity="0.15" />
+          </g>);
+
+      })}
+
+      {/* Rim light on hover */}
+      <circle
+      cx="250" cy="250" r="223"
+      stroke="#FF4500" strokeWidth="2"
+      strokeOpacity={hovered ? 0.35 : 0}
+      filter="url(#wtm-glow)"
+      style={{ transition: 'stroke-opacity 0.6s ease' }} />
+
+
+      {/* Inner radial fill */}
+      <circle cx="250" cy="250" r="222" fill="url(#wtm-rim)" />
+
+      {/* Section markers (N/S/E/W) */}
+      {[0, 90, 180, 270].map((deg) => {
+        const a = (deg - 90) * Math.PI / 180;
+        const r1 = 236;
+        const r2 = 244;
+        return (
+          <line
+          key={deg}
+          x1={250 + Math.cos(a) * r1} y1={250 + Math.sin(a) * r1}
+          x2={250 + Math.cos(a) * r2} y2={250 + Math.sin(a) * r2}
+          stroke="#FF4500" strokeWidth="1.5" strokeOpacity="0.2" />);
+
+
+      })}
+
+      {/* Mini ticks */}
+      {Array.from({ length: 36 }, (_, i) => {
+        if (i % 9 === 0) return null;
+        const a = i / 36 * Math.PI * 2 - Math.PI / 2;
+        const r1 = 238;
+        const r2 = 242;
+        return (
+          <line
+          key={`t-${i}`}
+          x1={250 + Math.cos(a) * r1} y1={250 + Math.sin(a) * r1}
+          x2={250 + Math.cos(a) * r2} y2={250 + Math.sin(a) * r2}
+          stroke="#FF4500" strokeWidth="0.4" strokeOpacity="0.1" />);
+
+
+      })}
+    </svg>);
+
+}
+
+// ── HUD overlay shown on hover ──
+function LensHUD() {
+  return (
+    <div className="absolute inset-0 z-20 pointer-events-none">
+      {/* Top-left readout */}
+      <div className="absolute top-[18%] left-[15%]">
+        <div className="text-[7px] font-display tracking-[0.15em] text-primary/40">VIEWPORT</div>
+        <div className="text-[9px] font-display tracking-[0.1em] text-white/40 font-bold">OLYMPUS MONS</div>
+      </div>
+      {/* Top-right coordinates */}
+      <div className="absolute top-[18%] right-[15%] text-right">
+        <div className="text-[7px] font-display tracking-[0.1em] text-primary/30">18.65°N 226.2°E</div>
+        <div className="text-[7px] font-display tracking-[0.1em] text-primary/30">ALT 21,229m</div>
+      </div>
+      {/* Bottom data */}
+      <div className="absolute bottom-[16%] left-1/2 -translate-x-1/2 flex gap-6">
+        {[
+        { label: 'TEMP', value: '-63°C' },
+        { label: 'WIND', value: '12 m/s' },
+        { label: 'VIS', value: '8.4 km' }].
+        map((d) =>
+        <div key={d.label} className="text-center">
+            <div className="text-[6px] font-display tracking-[0.15em] text-white/50">{d.label}</div>
+            <div className="text-[9px] font-display text-primary/50 font-bold tabular-nums">{d.value}</div>
+          </div>
+        )}
+      </div>
+      {/* Center crosshair */}
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
+        <line x1="46" y1="50" x2="40" y2="50" stroke="#FF4500" strokeWidth="0.3" strokeOpacity="0.2" />
+        <line x1="54" y1="50" x2="60" y2="50" stroke="#FF4500" strokeWidth="0.3" strokeOpacity="0.2" />
+        <line x1="50" y1="46" x2="50" y2="40" stroke="#FF4500" strokeWidth="0.3" strokeOpacity="0.2" />
+        <line x1="50" y1="54" x2="50" y2="60" stroke="#FF4500" strokeWidth="0.3" strokeOpacity="0.2" />
+        <circle cx="50" cy="50" r="5" stroke="#FF4500" strokeWidth="0.2" strokeOpacity="0.1" fill="none" />
+      </svg>
+    </div>);
+
+}
+
+// ── Main component ──
+function WindowToMars() {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef(0);
+  const motesRef = useRef<Mote[]>(createMotes(35, SIZE, SIZE));
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const intensityRef = useRef(0.15);
+  const targetIntensity = useRef(0.15);
+  const [hovered, setHovered] = useState(false);
+
+  // Animation loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let running = true;
+    const loop = () => {
+      if (!running) return;
+      // Ease intensity
+      intensityRef.current += (targetIntensity.current - intensityRef.current) * 0.06;
+      drawMars(
+        ctx, SIZE, SIZE,
+        mouseRef.current.x, mouseRef.current.y,
+        intensityRef.current,
+        motesRef.current
+      );
+      frameRef.current = requestAnimationFrame(loop);
+    };
+    frameRef.current = requestAnimationFrame(loop);
+    return () => {running = false;cancelAnimationFrame(frameRef.current);};
+  }, []);
+
+  // Hover state drives intensity
+  useEffect(() => {
+    targetIntensity.current = hovered ? 1 : 0.15;
+  }, [hovered]);
+
+  const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width - 0.5) * 2; // -1…1
+    const ny = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
+    mouseRef.current.x = nx;
+    mouseRef.current.y = ny;
+  }, []);
+
+  const onMouseLeave = useCallback(() => {
+    setHovered(false);
+    // Ease mouse back to center
+    const ease = () => {
+      mouseRef.current.x *= 0.9;
+      mouseRef.current.y *= 0.9;
+      if (Math.abs(mouseRef.current.x) > 0.01) requestAnimationFrame(ease);else
+      {mouseRef.current.x = 0;mouseRef.current.y = 0;}
+    };
+    requestAnimationFrame(ease);
+  }, []);
+
+  // Section entry animation
+  useGSAP(() => {
+    gsap.from('.wtm-head', {
+      y: 40, opacity: 0, stagger: 0.1, duration: 0.8,
+      scrollTrigger: { trigger: '.wtm-header', start: 'top 85%', once: true }
+    });
+    gsap.from('.wtm-porthole', {
+      scale: 0.85, opacity: 0, duration: 1.2, ease: 'expo.out',
+      scrollTrigger: { trigger: '.wtm-porthole', start: 'top 85%', once: true }
+    });
+  }, { scope: sectionRef });
+
+  return (
+    <section id="viewport" ref={sectionRef} className="relative z-10 py-20 sm:py-28 px-4 sm:px-6">
+      <div className="max-w-5xl mx-auto lg:pl-10">
+        {/* Header */}
+        <div className="wtm-header mb-10 sm:mb-14 text-center">
+          <span className="wtm-head inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/15 bg-primary/[0.04] mb-4">
+            <ScanEye className="w-3 h-3 text-primary" />
+            <span className="text-[10px] font-display tracking-[0.2em] text-primary/70">OBSERVATION DECK</span>
+          </span>
+
+          <h2 className="wtm-head font-display text-3xl sm:text-4xl md:text-5xl font-bold text-white leading-[1.1] mb-4">
+            WINDOW TO{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">MARS</span>
+          </h2>
+
+          <RevealText
+            text="Hover over the porthole to engage the observation lens. Move your cursor to pan across the Martian terrain."
+            className="wtm-head text-white/30 text-sm sm:text-base max-w-lg mx-auto leading-relaxed" />
+
+        </div>
+
+        {/* Porthole */}
+        <div className="flex justify-center">
+          <div
+          className="wtm-porthole relative cursor-crosshair"
+          style={{ width: 'min(80vw, 420px)', aspectRatio: '1' }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}>
+
+            {/* Canvas scene (clipped to circle) */}
+            <canvas
+            ref={canvasRef}
+            width={SIZE}
+            height={SIZE}
+            className="absolute inset-0 w-full h-full rounded-full"
+            style={{ clipPath: 'circle(44.5% at 50% 50%)' }} />
+
+
+            {/* Atmospheric rim glow on hover */}
+            <div
+            className="absolute inset-0 rounded-full pointer-events-none transition-opacity duration-700"
+            style={{
+              opacity: hovered ? 1 : 0,
+              boxShadow: `inset 0 0 60px 10px rgba(255,107,53,0.12), 0 0 80px 20px rgba(255,69,0,0.06)`
+            }} />
+
+
+            {/* HUD overlay on hover */}
+            <AnimatePresence>
+              {hovered &&
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.5, ease: EXPO_OUT }}
+                className="absolute inset-0"
+                style={{ clipPath: 'circle(44.5% at 50% 50%)' }}>
+
+                  <LensHUD />
+                </motion.div>
+              }
+            </AnimatePresence>
+
+            {/* Porthole frame ring (SVG) */}
+            <PortholeFrame hovered={hovered} />
+
+            {/* Status badge */}
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 rounded-full" style={{ background: 'rgba(8,8,18,0.85)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-500 ${hovered ? 'bg-green-500' : 'bg-white/30'}`} />
+              <span className={`text-[8px] font-display tracking-[0.15em] transition-colors duration-500 ${hovered ? 'text-green-400/60' : 'text-white/50'}`}>
+                {hovered ? 'LENS ACTIVE' : 'HOVER TO OBSERVE'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Instruction + data */}
+        <div className="mt-8 flex items-center justify-center gap-6 flex-wrap">
+          {[
+          { label: 'REGION', value: 'THARSIS PLATEAU' },
+          { label: 'ELEVATION', value: '21,229m' },
+          { label: 'ATMOSPHERE', value: '0.636 kPa' }].
+          map((d) =>
+          <div key={d.label} className="text-center">
+              <div className="text-[7px] font-display tracking-[0.18em] text-white/50">{d.label}</div>
+              <div className="text-[10px] font-display text-white/30 font-semibold">{d.value}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>);
+
+}
+
+export default memo(WindowToMars);

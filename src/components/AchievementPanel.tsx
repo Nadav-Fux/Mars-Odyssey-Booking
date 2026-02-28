@@ -1,1 +1,141 @@
-{"path":"src/components/AchievementPanel.tsx","content":"import { useState } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { Trophy, X, Lock } from 'lucide-react';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { ACHIEVEMENTS, useAchievements } from '@/hooks/useAchievements';\n\n/* ================================================================\n   ACHIEVEMENT PANEL\n\n   Toggleable floating panel showing all achievements.\n   Unlocked ones show icon + name. Locked secret ones show \"???\".\n   ================================================================ */\n\nexport default function AchievementPanel() {\n  const [isOpen, setIsOpen] = useState(false);\n  const { isUnlocked, totalUnlocked, totalAchievements } = useAchievements();\n\n  return (\n    <>\n      {/* Toggle button */}\n      <motion.button\n        onClick={() => setIsOpen((v) => !v)}\n        className=\"fixed top-20 right-6 z-[150] w-10 h-10 rounded-xl border backdrop-blur-sm items-center justify-center transition-all group hidden lg:flex\"\n        style={{\n          backgroundColor: isOpen ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)',\n          borderColor: isOpen ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'\n        }}\n        whileHover={{ scale: 1.05 }}\n        whileTap={{ scale: 0.95 }}\n        title=\"Achievements\">\n\n        <Trophy className=\"w-4 h-4 transition-colors\" style={{ color: isOpen ? '#f59e0b' : 'rgba(255,255,255,0.3)' }} />\n        {totalUnlocked > 0 &&\n        <div className=\"absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500/90 flex items-center justify-center\">\n            <span className=\"text-[7px] font-display font-bold text-black\">{totalUnlocked}</span>\n          </div>\n        }\n      </motion.button>\n\n      {/* Panel */}\n      <AnimatePresence>\n        {isOpen &&\n        <motion.div\n          initial={{ opacity: 0, x: 20, scale: 0.95 }}\n          animate={{ opacity: 1, x: 0, scale: 1 }}\n          exit={{ opacity: 0, x: 20, scale: 0.95 }}\n          transition={{ duration: 0.4, ease: EXPO_OUT }}\n          className=\"fixed top-20 right-[4.5rem] z-[150] w-[300px] rounded-2xl bg-[#0a0a12]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl overflow-hidden hidden lg:block\">\n\n            {/* Top accent */}\n            <div className=\"absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent\" />\n\n            {/* Header */}\n            <div className=\"flex items-center justify-between px-4 py-3 border-b border-white/[0.06]\">\n              <div className=\"flex items-center gap-2\">\n                <Trophy className=\"w-3.5 h-3.5 text-amber-400/60\" />\n                <span className=\"text-[9px] font-display tracking-[0.2em] text-amber-400/60 font-bold\">ACHIEVEMENTS</span>\n              </div>\n              <div className=\"flex items-center gap-2\">\n                <span className=\"text-[9px] font-display tracking-wider text-white/50\">\n                  {totalUnlocked}/{totalAchievements}\n                </span>\n                <button\n              onClick={() => setIsOpen(false)}\n              className=\"w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-colors\">\n\n                  <X className=\"w-3 h-3 text-white/30\" />\n                </button>\n              </div>\n            </div>\n\n            {/* Progress bar */}\n            <div className=\"px-4 py-2 border-b border-white/[0.04]\">\n              <div className=\"h-1 rounded-full bg-white/[0.04] overflow-hidden\">\n                <div\n              className=\"h-full rounded-full transition-all duration-700\"\n              style={{\n                width: `${totalUnlocked / totalAchievements * 100}%`,\n                background: 'linear-gradient(90deg, #f59e0b, #fbbf24)'\n              }} />\n\n              </div>\n            </div>\n\n            {/* Achievements list */}\n            <div className=\"px-3 py-2 max-h-[400px] overflow-y-auto space-y-1\">\n              {ACHIEVEMENTS.map((a) => {\n              const unlocked = isUnlocked(a.id);\n              const hidden = a.secret && !unlocked;\n\n              return (\n                <div\n                key={a.id}\n                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors ${\n                unlocked ? 'bg-amber-500/[0.04]' : 'opacity-40'}`\n                }>\n\n                    {/* Icon */}\n                    <div\n                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-sm ${\n                  unlocked ?\n                  'bg-amber-500/10 border border-amber-500/20' :\n                  'bg-white/[0.03] border border-white/[0.06]'}`\n                  }>\n\n                      {hidden ? <Lock className=\"w-3 h-3 text-white/50\" /> : unlocked ? a.icon : <span className=\"grayscale opacity-50\">{a.icon}</span>}\n                    </div>\n\n                    {/* Text */}\n                    <div className=\"min-w-0\">\n                      <div className={`text-[11px] font-medium truncate ${\n                    unlocked ? 'text-white/50' : 'text-white/50'}`\n                    }>\n                        {hidden ? '???' : a.title}\n                      </div>\n                      <div className=\"text-[9px] text-white/50 truncate\">\n                        {hidden ? 'Secret achievement' : a.description}\n                      </div>\n                    </div>\n\n                    {/* Check */}\n                    {unlocked &&\n                  <div className=\"shrink-0 ml-auto w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center\">\n                        <span className=\"text-[8px] text-amber-400\">✓</span>\n                      </div>\n                  }\n                  </div>);\n\n            })}\n            </div>\n\n            {/* Scanlines */}\n            <div className=\"absolute inset-0 pointer-events-none rounded-2xl overflow-hidden\" style={{\n            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.004) 3px, rgba(255,255,255,0.004) 4px)'\n          }} />\n          </motion.div>\n        }\n      </AnimatePresence>\n    </>);\n\n}","encoding":"utf8"}
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, X, Lock } from 'lucide-react';
+import { EXPO_OUT } from '@/lib/easing';
+import { ACHIEVEMENTS, useAchievements } from '@/hooks/useAchievements';
+
+/* ================================================================
+   ACHIEVEMENT PANEL
+
+   Toggleable floating panel showing all achievements.
+   Unlocked ones show icon + name. Locked secret ones show "???".
+   ================================================================ */
+
+export default function AchievementPanel() {
+  const [isOpen, setIsOpen] = useState(false);
+  const { isUnlocked, totalUnlocked, totalAchievements } = useAchievements();
+
+  return (
+    <>
+      {/* Toggle button */}
+      <motion.button
+        onClick={() => setIsOpen((v) => !v)}
+        className="fixed top-20 right-6 z-[150] w-10 h-10 rounded-xl border backdrop-blur-sm items-center justify-center transition-all group hidden lg:flex"
+        style={{
+          backgroundColor: isOpen ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)',
+          borderColor: isOpen ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'
+        }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        title="Achievements">
+
+        <Trophy className="w-4 h-4 transition-colors" style={{ color: isOpen ? '#f59e0b' : 'rgba(255,255,255,0.3)' }} />
+        {totalUnlocked > 0 &&
+        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500/90 flex items-center justify-center">
+            <span className="text-[7px] font-display font-bold text-black">{totalUnlocked}</span>
+          </div>
+        }
+      </motion.button>
+
+      {/* Panel */}
+      <AnimatePresence>
+        {isOpen &&
+        <motion.div
+          initial={{ opacity: 0, x: 20, scale: 0.95 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: 20, scale: 0.95 }}
+          transition={{ duration: 0.4, ease: EXPO_OUT }}
+          className="fixed top-20 right-[4.5rem] z-[150] w-[300px] rounded-2xl bg-[#0a0a12]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl overflow-hidden hidden lg:block">
+
+            {/* Top accent */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-3.5 h-3.5 text-amber-400/60" />
+                <span className="text-[9px] font-display tracking-[0.2em] text-amber-400/60 font-bold">ACHIEVEMENTS</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-display tracking-wider text-white/50">
+                  {totalUnlocked}/{totalAchievements}
+                </span>
+                <button
+              onClick={() => setIsOpen(false)}
+              className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center hover:bg-white/[0.08] transition-colors">
+
+                  <X className="w-3 h-3 text-white/30" />
+                </button>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="px-4 py-2 border-b border-white/[0.04]">
+              <div className="h-1 rounded-full bg-white/[0.04] overflow-hidden">
+                <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${totalUnlocked / totalAchievements * 100}%`,
+                background: 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+              }} />
+
+              </div>
+            </div>
+
+            {/* Achievements list */}
+            <div className="px-3 py-2 max-h-[400px] overflow-y-auto space-y-1">
+              {ACHIEVEMENTS.map((a) => {
+              const unlocked = isUnlocked(a.id);
+              const hidden = a.secret && !unlocked;
+
+              return (
+                <div
+                key={a.id}
+                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors ${
+                unlocked ? 'bg-amber-500/[0.04]' : 'opacity-40'}`
+                }>
+
+                    {/* Icon */}
+                    <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-sm ${
+                  unlocked ?
+                  'bg-amber-500/10 border border-amber-500/20' :
+                  'bg-white/[0.03] border border-white/[0.06]'}`
+                  }>
+
+                      {hidden ? <Lock className="w-3 h-3 text-white/50" /> : unlocked ? a.icon : <span className="grayscale opacity-50">{a.icon}</span>}
+                    </div>
+
+                    {/* Text */}
+                    <div className="min-w-0">
+                      <div className={`text-[11px] font-medium truncate ${
+                    unlocked ? 'text-white/50' : 'text-white/50'}`
+                    }>
+                        {hidden ? '???' : a.title}
+                      </div>
+                      <div className="text-[9px] text-white/50 truncate">
+                        {hidden ? 'Secret achievement' : a.description}
+                      </div>
+                    </div>
+
+                    {/* Check */}
+                    {unlocked &&
+                  <div className="shrink-0 ml-auto w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center">
+                        <span className="text-[8px] text-amber-400">✓</span>
+                      </div>
+                  }
+                  </div>);
+
+            })}
+            </div>
+
+            {/* Scanlines */}
+            <div className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden" style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.004) 3px, rgba(255,255,255,0.004) 4px)'
+          }} />
+          </motion.div>
+        }
+      </AnimatePresence>
+    </>);
+
+}

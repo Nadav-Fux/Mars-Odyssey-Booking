@@ -1,1 +1,253 @@
-{"path":"src/components/FinalTransmission.tsx","content":"import { useRef, useState, useEffect } from 'react';\nimport { motion, useScroll, useTransform } from 'framer-motion';\nimport { useGSAP } from '@gsap/react';\nimport { gsap } from '@/lib/gsap';\nimport { Radio, Rocket, ArrowRight } from 'lucide-react';\nimport { EXPO_OUT } from '@/lib/easing';\n\n/**\n * Full-screen dramatic CTA before footer.\n * Features:\n *  - Animated \"signal sending to Mars\" pulse rings\n *  - Typing terminal line \"ESTABLISHING UPLINK…\"\n *  - Big glowing CTA button\n *  - Particle drift background\n */\n\nconst TERMINAL_LINES = [\n{ text: '> ESTABLISHING DEEP-SPACE UPLINK...', delay: 0 },\n{ text: '> SIGNAL ROUTED VIA L2 RELAY CHAIN', delay: 1200 },\n{ text: '> MARS GROUND STATION: ONLINE', delay: 2200 },\n{ text: '> SEAT ALLOCATION SYSTEM: READY', delay: 3000 },\n{ text: '> AWAITING YOUR CONFIRMATION_', delay: 3800 }];\n\n\nfunction TerminalLine({ text, delay, started }: {text: string;delay: number;started: boolean;}) {\n  const [typed, setTyped] = useState('');\n  const [active, setActive] = useState(false);\n\n  useEffect(() => {\n    if (!started) return;\n    const timer = setTimeout(() => setActive(true), delay);\n    return () => clearTimeout(timer);\n  }, [started, delay]);\n\n  useEffect(() => {\n    if (!active) return;\n    let i = 0;\n    const id = setInterval(() => {\n      i++;\n      setTyped(text.slice(0, i));\n      if (i >= text.length) clearInterval(id);\n    }, 22);\n    return () => clearInterval(id);\n  }, [active, text]);\n\n  if (!active) return null;\n\n  const isComplete = typed.length >= text.length;\n  const isStatus = text.includes('ONLINE') || text.includes('READY');\n\n  return (\n    <motion.div\n      initial={{ opacity: 0, x: -10 }}\n      animate={{ opacity: 1, x: 0 }}\n      transition={{ duration: 0.3 }}\n      className=\"font-mono text-[11px] sm:text-xs leading-relaxed\">\n\n      <span className={isStatus && isComplete ? 'text-green-400/70' : 'text-white/30'}>\n        {typed}\n      </span>\n      {!isComplete &&\n      <span className=\"inline-block w-[6px] h-[13px] ml-0.5 bg-primary/70 animate-pulse align-middle\" />\n      }\n    </motion.div>);\n\n}\n\nfunction PulseRing({ delay, size }: {delay: number;size: number;}) {\n  return (\n    <motion.div\n      className=\"absolute top-1/2 left-1/2 rounded-full border border-primary/20 pointer-events-none\"\n      style={{\n        width: size,\n        height: size,\n        marginLeft: -size / 2,\n        marginTop: -size / 2\n      }}\n      initial={{ scale: 0.3, opacity: 0 }}\n      animate={{\n        scale: [0.3, 1.2],\n        opacity: [0.6, 0]\n      }}\n      transition={{\n        duration: 3,\n        delay,\n        repeat: Infinity,\n        ease: 'easeOut'\n      }} />);\n\n\n}\n\nexport default function FinalTransmission() {\n  const ref = useRef<HTMLDivElement>(null);\n  const [started, setStarted] = useState(false);\n\n  // Start terminal when scrolled into view\n  useEffect(() => {\n    const el = ref.current;\n    if (!el) return;\n    const obs = new IntersectionObserver(\n      ([e]) => {if (e.isIntersecting) setStarted(true);},\n      { threshold: 0.25 }\n    );\n    obs.observe(el);\n    return () => obs.disconnect();\n  }, []);\n\n  // GSAP entrance\n  useGSAP(() => {\n    gsap.from('.ft-element', {\n      y: 40,\n      opacity: 0,\n      stagger: 0.15,\n      duration: 0.9,\n      scrollTrigger: { trigger: ref.current, start: 'top 80%' }\n    });\n  }, { scope: ref });\n\n  const scrollToBooking = () => {\n    document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });\n  };\n\n  return (\n    <section\n    ref={ref}\n    className=\"relative z-10 py-28 sm:py-40 px-6 overflow-hidden\">\n\n      {/* Background radial */}\n      <div\n      className=\"absolute inset-0 pointer-events-none\"\n      style={{\n        background: 'radial-gradient(ellipse at center, rgba(255,69,0,0.04) 0%, transparent 60%)'\n      }} />\n\n\n      {/* Pulse rings */}\n      <div className=\"absolute inset-0 pointer-events-none overflow-hidden\">\n        <PulseRing delay={0} size={300} />\n        <PulseRing delay={0.8} size={500} />\n        <PulseRing delay={1.6} size={700} />\n        <PulseRing delay={2.4} size={900} />\n      </div>\n\n      <div className=\"relative max-w-3xl mx-auto\">\n        {/* Signal icon */}\n        <div className=\"ft-element flex justify-center mb-8\">\n          <motion.div\n            className=\"relative w-16 h-16 rounded-full flex items-center justify-center\"\n            style={{\n              background: 'rgba(255,69,0,0.06)',\n              border: '1px solid rgba(255,69,0,0.15)',\n              boxShadow: '0 0 40px rgba(255,69,0,0.1)'\n            }}\n            animate={{ boxShadow: [\n              '0 0 40px rgba(255,69,0,0.1)',\n              '0 0 60px rgba(255,69,0,0.2)',\n              '0 0 40px rgba(255,69,0,0.1)']\n            }}\n            transition={{ duration: 3, repeat: Infinity }}>\n\n            <Radio className=\"w-7 h-7 text-primary\" />\n          </motion.div>\n        </div>\n\n        {/* Heading */}\n        <h2 className=\"ft-element font-display text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] text-center mb-3\">\n          DON'T LET THIS\n          <br />\n          <span className=\"text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary\">\n            SIGNAL FADE\n          </span>\n        </h2>\n\n        <p className=\"ft-element text-white/50 text-sm sm:text-base text-center max-w-lg mx-auto mb-10 leading-relaxed\">\n          Only 47 seats remain for the March 2026 launch window.\n          Every second you wait, the signal gets weaker.\n        </p>\n\n        {/* Terminal block */}\n        <div\n        className=\"ft-element rounded-2xl overflow-hidden mb-10 mx-auto max-w-xl\"\n        style={{\n          background: 'rgba(255,255,255,0.015)',\n          border: '1px solid rgba(255,255,255,0.06)'\n        }}>\n\n          {/* Terminal header */}\n          <div\n          className=\"flex items-center gap-2 px-4 py-2.5\"\n          style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>\n\n            <div className=\"flex gap-1.5\">\n              <div className=\"w-2.5 h-2.5 rounded-full bg-red-500/60\" />\n              <div className=\"w-2.5 h-2.5 rounded-full bg-yellow-500/60\" />\n              <div className=\"w-2.5 h-2.5 rounded-full bg-green-500/60\" />\n            </div>\n            <span className=\"text-[9px] font-mono text-white/50 tracking-wider ml-2\">\n              ARES-X UPLINK TERMINAL\n            </span>\n          </div>\n\n          {/* Terminal body */}\n          <div className=\"p-4 sm:p-5 space-y-1.5 min-h-[110px]\">\n            {TERMINAL_LINES.map((line) =>\n            <TerminalLine\n              key={line.text}\n              text={line.text}\n              delay={line.delay}\n              started={started} />\n\n            )}\n          </div>\n        </div>\n\n        {/* CTA Button */}\n        <div className=\"ft-element flex justify-center\">\n          <motion.button\n            onClick={scrollToBooking}\n            whileHover={{ scale: 1.04 }}\n            whileTap={{ scale: 0.97 }}\n            className=\"group relative px-10 py-4 sm:py-5 rounded-2xl font-display text-sm sm:text-base font-bold tracking-[0.15em] text-white cursor-pointer overflow-hidden\">\n\n            {/* Glow bg */}\n            <div className=\"absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-2xl\" />\n            <div className=\"absolute inset-0 bg-gradient-to-r from-primary to-accent opacity-0 group-hover:opacity-100 blur-2xl transition-opacity duration-700 rounded-2xl\" />\n            {/* Animated shimmer */}\n            <motion.div\n              className=\"absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent\"\n              animate={{ x: ['-100%', '200%'] }}\n              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}\n              style={{ width: '50%' }} />\n\n            <span className=\"relative flex items-center gap-3\">\n              <Rocket className=\"w-4 h-4 -rotate-45\" />\n              SECURE MY SEAT NOW\n              <ArrowRight className=\"w-4 h-4 group-hover:translate-x-1 transition-transform\" />\n            </span>\n          </motion.button>\n        </div>\n\n        {/* Urgency note */}\n        <motion.p\n          className=\"text-center mt-6 text-[10px] font-display tracking-[0.15em] text-white/50\"\n          animate={{ opacity: [0.3, 0.6, 0.3] }}\n          transition={{ duration: 2.5, repeat: Infinity }}>\n\n          ⚡ 3 SEATS BOOKED IN THE LAST HOUR\n        </motion.p>\n      </div>\n    </section>);\n\n}","encoding":"utf8"}
+import { useRef, useState, useEffect } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { useGSAP } from '@gsap/react';
+import { gsap } from '@/lib/gsap';
+import { Radio, Rocket, ArrowRight } from 'lucide-react';
+import { EXPO_OUT } from '@/lib/easing';
+
+/**
+ * Full-screen dramatic CTA before footer.
+ * Features:
+ *  - Animated "signal sending to Mars" pulse rings
+ *  - Typing terminal line "ESTABLISHING UPLINK…"
+ *  - Big glowing CTA button
+ *  - Particle drift background
+ */
+
+const TERMINAL_LINES = [
+{ text: '> ESTABLISHING DEEP-SPACE UPLINK...', delay: 0 },
+{ text: '> SIGNAL ROUTED VIA L2 RELAY CHAIN', delay: 1200 },
+{ text: '> MARS GROUND STATION: ONLINE', delay: 2200 },
+{ text: '> SEAT ALLOCATION SYSTEM: READY', delay: 3000 },
+{ text: '> AWAITING YOUR CONFIRMATION_', delay: 3800 }];
+
+
+function TerminalLine({ text, delay, started }: {text: string;delay: number;started: boolean;}) {
+  const [typed, setTyped] = useState('');
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    if (!started) return;
+    const timer = setTimeout(() => setActive(true), delay);
+    return () => clearTimeout(timer);
+  }, [started, delay]);
+
+  useEffect(() => {
+    if (!active) return;
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setTyped(text.slice(0, i));
+      if (i >= text.length) clearInterval(id);
+    }, 22);
+    return () => clearInterval(id);
+  }, [active, text]);
+
+  if (!active) return null;
+
+  const isComplete = typed.length >= text.length;
+  const isStatus = text.includes('ONLINE') || text.includes('READY');
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3 }}
+      className="font-mono text-[11px] sm:text-xs leading-relaxed">
+
+      <span className={isStatus && isComplete ? 'text-green-400/70' : 'text-white/30'}>
+        {typed}
+      </span>
+      {!isComplete &&
+      <span className="inline-block w-[6px] h-[13px] ml-0.5 bg-primary/70 animate-pulse align-middle" />
+      }
+    </motion.div>);
+
+}
+
+function PulseRing({ delay, size }: {delay: number;size: number;}) {
+  return (
+    <motion.div
+      className="absolute top-1/2 left-1/2 rounded-full border border-primary/20 pointer-events-none"
+      style={{
+        width: size,
+        height: size,
+        marginLeft: -size / 2,
+        marginTop: -size / 2
+      }}
+      initial={{ scale: 0.3, opacity: 0 }}
+      animate={{
+        scale: [0.3, 1.2],
+        opacity: [0.6, 0]
+      }}
+      transition={{
+        duration: 3,
+        delay,
+        repeat: Infinity,
+        ease: 'easeOut'
+      }} />);
+
+
+}
+
+export default function FinalTransmission() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [started, setStarted] = useState(false);
+
+  // Start terminal when scrolled into view
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => {if (e.isIntersecting) setStarted(true);},
+      { threshold: 0.25 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // GSAP entrance
+  useGSAP(() => {
+    gsap.from('.ft-element', {
+      y: 40,
+      opacity: 0,
+      stagger: 0.15,
+      duration: 0.9,
+      scrollTrigger: { trigger: ref.current, start: 'top 80%' }
+    });
+  }, { scope: ref });
+
+  const scrollToBooking = () => {
+    document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  return (
+    <section
+    ref={ref}
+    className="relative z-10 py-28 sm:py-40 px-6 overflow-hidden">
+
+      {/* Background radial */}
+      <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        background: 'radial-gradient(ellipse at center, rgba(255,69,0,0.04) 0%, transparent 60%)'
+      }} />
+
+
+      {/* Pulse rings */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <PulseRing delay={0} size={300} />
+        <PulseRing delay={0.8} size={500} />
+        <PulseRing delay={1.6} size={700} />
+        <PulseRing delay={2.4} size={900} />
+      </div>
+
+      <div className="relative max-w-3xl mx-auto">
+        {/* Signal icon */}
+        <div className="ft-element flex justify-center mb-8">
+          <motion.div
+            className="relative w-16 h-16 rounded-full flex items-center justify-center"
+            style={{
+              background: 'rgba(255,69,0,0.06)',
+              border: '1px solid rgba(255,69,0,0.15)',
+              boxShadow: '0 0 40px rgba(255,69,0,0.1)'
+            }}
+            animate={{ boxShadow: [
+              '0 0 40px rgba(255,69,0,0.1)',
+              '0 0 60px rgba(255,69,0,0.2)',
+              '0 0 40px rgba(255,69,0,0.1)']
+            }}
+            transition={{ duration: 3, repeat: Infinity }}>
+
+            <Radio className="w-7 h-7 text-primary" />
+          </motion.div>
+        </div>
+
+        {/* Heading */}
+        <h2 className="ft-element font-display text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] text-center mb-3">
+          DON'T LET THIS
+          <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary">
+            SIGNAL FADE
+          </span>
+        </h2>
+
+        <p className="ft-element text-white/50 text-sm sm:text-base text-center max-w-lg mx-auto mb-10 leading-relaxed">
+          Only 47 seats remain for the March 2026 launch window.
+          Every second you wait, the signal gets weaker.
+        </p>
+
+        {/* Terminal block */}
+        <div
+        className="ft-element rounded-2xl overflow-hidden mb-10 mx-auto max-w-xl"
+        style={{
+          background: 'rgba(255,255,255,0.015)',
+          border: '1px solid rgba(255,255,255,0.06)'
+        }}>
+
+          {/* Terminal header */}
+          <div
+          className="flex items-center gap-2 px-4 py-2.5"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
+            </div>
+            <span className="text-[9px] font-mono text-white/50 tracking-wider ml-2">
+              ARES-X UPLINK TERMINAL
+            </span>
+          </div>
+
+          {/* Terminal body */}
+          <div className="p-4 sm:p-5 space-y-1.5 min-h-[110px]">
+            {TERMINAL_LINES.map((line) =>
+            <TerminalLine
+              key={line.text}
+              text={line.text}
+              delay={line.delay}
+              started={started} />
+
+            )}
+          </div>
+        </div>
+
+        {/* CTA Button */}
+        <div className="ft-element flex justify-center">
+          <motion.button
+            onClick={scrollToBooking}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            className="group relative px-10 py-4 sm:py-5 rounded-2xl font-display text-sm sm:text-base font-bold tracking-[0.15em] text-white cursor-pointer overflow-hidden">
+
+            {/* Glow bg */}
+            <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-2xl" />
+            <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent opacity-0 group-hover:opacity-100 blur-2xl transition-opacity duration-700 rounded-2xl" />
+            {/* Animated shimmer */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+              animate={{ x: ['-100%', '200%'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+              style={{ width: '50%' }} />
+
+            <span className="relative flex items-center gap-3">
+              <Rocket className="w-4 h-4 -rotate-45" />
+              SECURE MY SEAT NOW
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </motion.button>
+        </div>
+
+        {/* Urgency note */}
+        <motion.p
+          className="text-center mt-6 text-[10px] font-display tracking-[0.15em] text-white/50"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 2.5, repeat: Infinity }}>
+
+          ⚡ 3 SEATS BOOKED IN THE LAST HOUR
+        </motion.p>
+      </div>
+    </section>);
+
+}

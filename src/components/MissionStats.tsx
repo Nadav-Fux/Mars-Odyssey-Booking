@@ -1,1 +1,234 @@
-{"path":"src/components/MissionStats.tsx","content":"import { useRef, useEffect, useState, memo } from 'react';\nimport { motion, useInView } from 'framer-motion';\nimport { useGSAP } from '@gsap/react';\nimport { gsap } from '@/lib/gsap';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { TrendingUp } from 'lucide-react';\n\n/* ================================================================\n   MISSION STATS — UPGRADED\n\n   Cinematic stat strip with:\n     • Radial progress circles (SVG)\n     • Animated count-up numbers\n     • Live pulse effect on numbers\n     • Mini sparkline charts per stat\n     • \"Live\" data simulation\n     • Trend indicators\n   ================================================================ */\n\nfunction Counter({ target, suffix = '' }: {target: number;suffix?: string;}) {\n  const [val, setVal] = useState(0);\n  const elRef = useRef<HTMLSpanElement>(null);\n  const ran = useRef(false);\n\n  useEffect(() => {\n    const obs = new IntersectionObserver(\n      ([e]) => {\n        if (e.isIntersecting && !ran.current) {\n          ran.current = true;\n          const dur = 2400;\n          const t0 = performance.now();\n          const tick = (now: number) => {\n            const p = Math.min((now - t0) / dur, 1);\n            const ease = 1 - Math.pow(2, -10 * p);\n            setVal(Math.floor(ease * target));\n            if (p < 1) requestAnimationFrame(tick);\n          };\n          requestAnimationFrame(tick);\n        }\n      },\n      { threshold: 0.3 }\n    );\n    if (elRef.current) obs.observe(elRef.current);\n    return () => obs.disconnect();\n  }, [target]);\n\n  return (\n    <span ref={elRef}>\n      {val.toLocaleString()}\n      {suffix}\n    </span>);\n\n}\n\n/* ── Radial Progress Circle ── */\nfunction RadialProgress({\n  progress, color, size = 64\n}: {progress: number;color: string;size?: number;}) {\n  const ref = useRef<SVGCircleElement>(null);\n  const inView = useInView(ref as any, { once: true, margin: '-20%' });\n  const radius = (size - 6) / 2;\n  const circumference = 2 * Math.PI * radius;\n  const offset = circumference * (1 - progress);\n\n  return (\n    <svg width={size} height={size} className=\"-rotate-90 shrink-0\">\n      {/* Background track */}\n      <circle\n      cx={size / 2} cy={size / 2} r={radius}\n      fill=\"none\" stroke=\"rgba(255,255,255,0.04)\" strokeWidth=\"3\" />\n\n      {/* Progress arc */}\n      <circle\n      ref={ref}\n      cx={size / 2} cy={size / 2} r={radius}\n      fill=\"none\" stroke={color} strokeWidth=\"3\" strokeLinecap=\"round\"\n      strokeDasharray={circumference}\n      strokeDashoffset={inView ? offset : circumference}\n      style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.16,1,0.3,1)', filter: `drop-shadow(0 0 6px ${color}40)` }} />\n\n      {/* Pulse dot at end of arc */}\n      {inView &&\n      <circle\n      cx={size / 2 + radius * Math.cos(2 * Math.PI * progress - Math.PI / 2)}\n      cy={size / 2 + radius * Math.sin(2 * Math.PI * progress - Math.PI / 2)}\n      r=\"3\" fill={color}>\n\n          <animate attributeName=\"r\" values=\"2;4;2\" dur=\"2s\" repeatCount=\"indefinite\" />\n          <animate attributeName=\"opacity\" values=\"1;0.5;1\" dur=\"2s\" repeatCount=\"indefinite\" />\n        </circle>\n      }\n    </svg>);\n\n}\n\n/* ── Sparkline ── */\nfunction Sparkline({ data, color }: {data: number[];color: string;}) {\n  const max = Math.max(...data);\n  const min = Math.min(...data);\n  const range = max - min || 1;\n  const w = 60;\n  const h = 20;\n  const points = data.map((v, i) => {\n    const x = i / (data.length - 1) * w;\n    const y = h - (v - min) / range * h * 0.8 - h * 0.1;\n    return `${x},${y}`;\n  }).join(' ');\n\n  return (\n    <svg viewBox={`0 0 ${w} ${h}`} className=\"w-[60px] h-[20px]\">\n      <defs>\n        <linearGradient id={`spark-${color.replace('#', '')}`} x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">\n          <stop offset=\"0%\" stopColor={color} stopOpacity=\"0.3\" />\n          <stop offset=\"100%\" stopColor={color} stopOpacity=\"0\" />\n        </linearGradient>\n      </defs>\n      <polygon\n      points={`0,${h} ${points} ${w},${h}`}\n      fill={`url(#spark-${color.replace('#', '')})`} />\n\n      <polyline\n      points={points}\n      fill=\"none\" stroke={color} strokeWidth=\"1.5\" strokeOpacity=\"0.6\" strokeLinejoin=\"round\" />\n\n      {/* End dot */}\n      <circle\n      cx={w}\n      cy={h - (data[data.length - 1] - min) / range * h * 0.8 - h * 0.1}\n      r=\"2\" fill={color}>\n\n        <animate attributeName=\"r\" values=\"1.5;2.5;1.5\" dur=\"1.5s\" repeatCount=\"indefinite\" />\n      </circle>\n    </svg>);\n\n}\n\ninterface StatData {\n  val: number;\n  suffix: string;\n  label: string;\n  color: string;\n  gauge: number;\n  trend: number;\n  sparkline: number[];\n}\n\nconst DATA: StatData[] = [\n{\n  val: 47, suffix: '', label: 'COMPLETED MISSIONS', color: '#FF4500', gauge: 0.85,\n  trend: 12, sparkline: [28, 31, 35, 33, 38, 40, 42, 41, 44, 45, 47, 47]\n},\n{\n  val: 2847, suffix: '+', label: 'PASSENGERS BOOKED', color: '#4ab8c4', gauge: 0.72,\n  trend: 23, sparkline: [800, 1100, 1400, 1600, 1800, 2000, 2200, 2350, 2500, 2650, 2780, 2847]\n},\n{\n  val: 12, suffix: '', label: 'MARS SURFACE BASES', color: '#ff6b35', gauge: 0.45,\n  trend: 3, sparkline: [3, 4, 5, 6, 7, 8, 8, 9, 10, 10, 11, 12]\n},\n{\n  val: 8, suffix: '', label: 'YEARS OPERATIONAL', color: '#6b8aed', gauge: 0.92,\n  trend: 1, sparkline: [1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8]\n}];\n\n\nfunction MissionStats() {\n  const ref = useRef<HTMLDivElement>(null);\n\n  useGSAP(() => {\n    gsap.from('.ms-stat', {\n      y: 60, opacity: 0, stagger: 0.15, duration: 1, ease: 'expo.out',\n      scrollTrigger: { trigger: ref.current, start: 'top 85%' }\n    });\n  }, { scope: ref });\n\n  return (\n    <section ref={ref} className=\"relative z-10 py-20 sm:py-32 px-4 sm:px-6\">\n      <div className=\"max-w-6xl mx-auto lg:pl-10\">\n        {/* Section label */}\n        <div className=\"flex items-center gap-3 mb-12 sm:mb-16\">\n          <div className=\"h-px flex-1 bg-gradient-to-r from-white/[0.06] to-transparent\" />\n          <span className=\"text-[9px] font-display tracking-[0.3em] text-white/50 uppercase\">MISSION OVERVIEW</span>\n          <div className=\"h-px flex-1 bg-gradient-to-l from-white/[0.06] to-transparent\" />\n        </div>\n\n        {/* Stats grid */}\n        <div className=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6\">\n          {DATA.map((d) =>\n          <div key={d.label} className=\"ms-stat group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 overflow-hidden hover:border-white/[0.12] transition-colors duration-500\">\n              {/* Glow */}\n              <div\n            className=\"absolute -top-10 -right-10 w-28 h-28 rounded-full blur-[60px] opacity-0 group-hover:opacity-20 transition-opacity duration-700\"\n            style={{ backgroundColor: d.color }} />\n\n\n              {/* Radial progress + Number */}\n              <div className=\"flex items-center gap-4 mb-4\">\n                <RadialProgress progress={d.gauge} color={d.color} size={56} />\n                <div>\n                  <div\n                className=\"font-display text-3xl sm:text-4xl font-bold tabular-nums leading-none\"\n                style={{ color: d.color }}>\n\n                    <Counter target={d.val} suffix={d.suffix} />\n                  </div>\n                  <span className=\"text-[8px] font-display tracking-[0.2em] text-white/50\">{d.label}</span>\n                </div>\n              </div>\n\n              {/* Sparkline + trend */}\n              <div className=\"flex items-center justify-between\">\n                <Sparkline data={d.sparkline} color={d.color} />\n                <div className=\"flex items-center gap-1\">\n                  <TrendingUp className=\"w-3 h-3\" style={{ color: '#22c55e80' }} />\n                  <span className=\"text-[9px] font-display tracking-wider text-green-400/50\">\n                    +{d.trend} YoY\n                  </span>\n                </div>\n              </div>\n\n              {/* Bottom accent line */}\n              <div\n            className=\"absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-500\"\n            style={{ background: `linear-gradient(90deg, transparent, ${d.color}40, transparent)` }} />\n\n            </div>\n          )}\n        </div>\n      </div>\n    </section>);\n\n}\n\nexport default memo(MissionStats);","encoding":"utf8"}
+import { useRef, useEffect, useState, memo } from 'react';
+import { motion, useInView } from 'framer-motion';
+import { useGSAP } from '@gsap/react';
+import { gsap } from '@/lib/gsap';
+import { EXPO_OUT } from '@/lib/easing';
+import { TrendingUp } from 'lucide-react';
+
+/* ================================================================
+   MISSION STATS — UPGRADED
+
+   Cinematic stat strip with:
+     • Radial progress circles (SVG)
+     • Animated count-up numbers
+     • Live pulse effect on numbers
+     • Mini sparkline charts per stat
+     • "Live" data simulation
+     • Trend indicators
+   ================================================================ */
+
+function Counter({ target, suffix = '' }: {target: number;suffix?: string;}) {
+  const [val, setVal] = useState(0);
+  const elRef = useRef<HTMLSpanElement>(null);
+  const ran = useRef(false);
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting && !ran.current) {
+          ran.current = true;
+          const dur = 2400;
+          const t0 = performance.now();
+          const tick = (now: number) => {
+            const p = Math.min((now - t0) / dur, 1);
+            const ease = 1 - Math.pow(2, -10 * p);
+            setVal(Math.floor(ease * target));
+            if (p < 1) requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+      },
+      { threshold: 0.3 }
+    );
+    if (elRef.current) obs.observe(elRef.current);
+    return () => obs.disconnect();
+  }, [target]);
+
+  return (
+    <span ref={elRef}>
+      {val.toLocaleString()}
+      {suffix}
+    </span>);
+
+}
+
+/* ── Radial Progress Circle ── */
+function RadialProgress({
+  progress, color, size = 64
+}: {progress: number;color: string;size?: number;}) {
+  const ref = useRef<SVGCircleElement>(null);
+  const inView = useInView(ref as any, { once: true, margin: '-20%' });
+  const radius = (size - 6) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - progress);
+
+  return (
+    <svg width={size} height={size} className="-rotate-90 shrink-0">
+      {/* Background track */}
+      <circle
+      cx={size / 2} cy={size / 2} r={radius}
+      fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="3" />
+
+      {/* Progress arc */}
+      <circle
+      ref={ref}
+      cx={size / 2} cy={size / 2} r={radius}
+      fill="none" stroke={color} strokeWidth="3" strokeLinecap="round"
+      strokeDasharray={circumference}
+      strokeDashoffset={inView ? offset : circumference}
+      style={{ transition: 'stroke-dashoffset 2s cubic-bezier(0.16,1,0.3,1)', filter: `drop-shadow(0 0 6px ${color}40)` }} />
+
+      {/* Pulse dot at end of arc */}
+      {inView &&
+      <circle
+      cx={size / 2 + radius * Math.cos(2 * Math.PI * progress - Math.PI / 2)}
+      cy={size / 2 + radius * Math.sin(2 * Math.PI * progress - Math.PI / 2)}
+      r="3" fill={color}>
+
+          <animate attributeName="r" values="2;4;2" dur="2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+        </circle>
+      }
+    </svg>);
+
+}
+
+/* ── Sparkline ── */
+function Sparkline({ data, color }: {data: number[];color: string;}) {
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const w = 60;
+  const h = 20;
+  const points = data.map((v, i) => {
+    const x = i / (data.length - 1) * w;
+    const y = h - (v - min) / range * h * 0.8 - h * 0.1;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-[60px] h-[20px]">
+      <defs>
+        <linearGradient id={`spark-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon
+      points={`0,${h} ${points} ${w},${h}`}
+      fill={`url(#spark-${color.replace('#', '')})`} />
+
+      <polyline
+      points={points}
+      fill="none" stroke={color} strokeWidth="1.5" strokeOpacity="0.6" strokeLinejoin="round" />
+
+      {/* End dot */}
+      <circle
+      cx={w}
+      cy={h - (data[data.length - 1] - min) / range * h * 0.8 - h * 0.1}
+      r="2" fill={color}>
+
+        <animate attributeName="r" values="1.5;2.5;1.5" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+    </svg>);
+
+}
+
+interface StatData {
+  val: number;
+  suffix: string;
+  label: string;
+  color: string;
+  gauge: number;
+  trend: number;
+  sparkline: number[];
+}
+
+const DATA: StatData[] = [
+{
+  val: 47, suffix: '', label: 'COMPLETED MISSIONS', color: '#FF4500', gauge: 0.85,
+  trend: 12, sparkline: [28, 31, 35, 33, 38, 40, 42, 41, 44, 45, 47, 47]
+},
+{
+  val: 2847, suffix: '+', label: 'PASSENGERS BOOKED', color: '#4ab8c4', gauge: 0.72,
+  trend: 23, sparkline: [800, 1100, 1400, 1600, 1800, 2000, 2200, 2350, 2500, 2650, 2780, 2847]
+},
+{
+  val: 12, suffix: '', label: 'MARS SURFACE BASES', color: '#ff6b35', gauge: 0.45,
+  trend: 3, sparkline: [3, 4, 5, 6, 7, 8, 8, 9, 10, 10, 11, 12]
+},
+{
+  val: 8, suffix: '', label: 'YEARS OPERATIONAL', color: '#6b8aed', gauge: 0.92,
+  trend: 1, sparkline: [1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8]
+}];
+
+
+function MissionStats() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    gsap.from('.ms-stat', {
+      y: 60, opacity: 0, stagger: 0.15, duration: 1, ease: 'expo.out',
+      scrollTrigger: { trigger: ref.current, start: 'top 85%' }
+    });
+  }, { scope: ref });
+
+  return (
+    <section ref={ref} className="relative z-10 py-20 sm:py-32 px-4 sm:px-6">
+      <div className="max-w-6xl mx-auto lg:pl-10">
+        {/* Section label */}
+        <div className="flex items-center gap-3 mb-12 sm:mb-16">
+          <div className="h-px flex-1 bg-gradient-to-r from-white/[0.06] to-transparent" />
+          <span className="text-[9px] font-display tracking-[0.3em] text-white/50 uppercase">MISSION OVERVIEW</span>
+          <div className="h-px flex-1 bg-gradient-to-l from-white/[0.06] to-transparent" />
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {DATA.map((d) =>
+          <div key={d.label} className="ms-stat group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 sm:p-6 overflow-hidden hover:border-white/[0.12] transition-colors duration-500">
+              {/* Glow */}
+              <div
+            className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-[60px] opacity-0 group-hover:opacity-20 transition-opacity duration-700"
+            style={{ backgroundColor: d.color }} />
+
+
+              {/* Radial progress + Number */}
+              <div className="flex items-center gap-4 mb-4">
+                <RadialProgress progress={d.gauge} color={d.color} size={56} />
+                <div>
+                  <div
+                className="font-display text-3xl sm:text-4xl font-bold tabular-nums leading-none"
+                style={{ color: d.color }}>
+
+                    <Counter target={d.val} suffix={d.suffix} />
+                  </div>
+                  <span className="text-[8px] font-display tracking-[0.2em] text-white/50">{d.label}</span>
+                </div>
+              </div>
+
+              {/* Sparkline + trend */}
+              <div className="flex items-center justify-between">
+                <Sparkline data={d.sparkline} color={d.color} />
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" style={{ color: '#22c55e80' }} />
+                  <span className="text-[9px] font-display tracking-wider text-green-400/50">
+                    +{d.trend} YoY
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom accent line */}
+              <div
+            className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+            style={{ background: `linear-gradient(90deg, transparent, ${d.color}40, transparent)` }} />
+
+            </div>
+          )}
+        </div>
+      </div>
+    </section>);
+
+}
+
+export default memo(MissionStats);

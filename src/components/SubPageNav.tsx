@@ -1,1 +1,141 @@
-{"path":"src/components/SubPageNav.tsx","content":"import { useState } from 'react';\nimport { Link, useLocation } from 'react-router';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { ArrowLeft, Rocket, Ship, Users, ClipboardList, Globe, Menu, X, Crosshair } from 'lucide-react';\nimport GlitchText from '@/components/GlitchText';\nimport { EXPO_OUT } from '@/lib/easing';\n\nconst NAV_LINKS = [\n{ path: '/', icon: Rocket, label: 'Home' },\n{ path: '/ship', icon: Ship, label: 'The Ship' },\n{ path: '/crew', icon: Users, label: 'The Crew' },\n{ path: '/mission', icon: ClipboardList, label: 'Mission Info' },\n{ path: '/explore', icon: Globe, label: 'Explore Mars' },\n{ path: '/simulate', icon: Crosshair, label: 'Simulator' }];\n\n\nexport default function SubPageNav() {\n  const location = useLocation();\n  const [mobileOpen, setMobileOpen] = useState(false);\n\n  return (\n    <>\n      {/* Desktop nav */}\n      <motion.nav\n        initial={{ y: -80, opacity: 0 }}\n        animate={{ y: 0, opacity: 1 }}\n        transition={{ duration: 0.8, delay: 0.2, ease: EXPO_OUT }}\n        className=\"fixed top-0 left-0 right-0 z-50 hidden lg:block\">\n\n        <div className=\"max-w-6xl mx-auto px-6 py-4 flex items-center justify-between\">\n          <div className=\"flex items-center gap-6\">\n            {/* Back home */}\n            <Link\n              to=\"/\"\n              className=\"flex items-center gap-2.5 group\">\n\n              <div className=\"w-10 h-10 rounded-xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] flex items-center justify-center group-hover:border-primary/30 group-hover:bg-primary/[0.06] transition-all\">\n                <Rocket className=\"w-5 h-5 text-primary -rotate-45\" />\n              </div>\n              <span className=\"font-display text-sm font-bold text-white tracking-[0.15em]\">\n                ARES<span className=\"text-primary\">-X</span>\n              </span>\n            </Link>\n\n            <div className=\"h-6 w-px bg-white/[0.06]\" />\n\n            {/* Nav links */}\n            <div className=\"flex items-center gap-1\">\n              {NAV_LINKS.filter((l) => l.path !== '/').map((link) => {\n                const Icon = link.icon;\n                const isActive = location.pathname === link.path;\n                return (\n                  <Link\n                    key={link.path}\n                    to={link.path}\n                    className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-display font-medium tracking-wider transition-all ${\n                    isActive ?\n                    'bg-primary/10 text-primary border border-primary/20' :\n                    'text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-transparent'}`\n                    }>\n\n                    <Icon className=\"w-3.5 h-3.5\" />\n                    {link.label.toUpperCase()}\n                  </Link>);\n\n              })}\n            </div>\n          </div>\n\n          {/* Back to home CTA */}\n          <Link\n            to=\"/\"\n            className=\"flex items-center gap-2 text-white/30 text-xs font-display tracking-wider hover:text-primary transition-colors\">\n\n            <ArrowLeft className=\"w-3.5 h-3.5\" />\n            BACK TO HOME\n          </Link>\n        </div>\n\n        {/* Bottom border glow */}\n        <div className=\"absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent\" />\n        <div className=\"absolute inset-0 bg-black/60 backdrop-blur-2xl -z-10\" />\n      </motion.nav>\n\n      {/* Mobile top bar */}\n      <div className=\"lg:hidden fixed top-0 left-0 right-0 z-50\">\n        <div className=\"flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-2xl border-b border-white/[0.06]\">\n          <Link to=\"/\" className=\"flex items-center gap-2\">\n            <Rocket className=\"w-5 h-5 text-primary -rotate-45\" />\n            <span className=\"font-display text-sm font-bold text-white tracking-wider\">\n              ARES<span className=\"text-primary\">-X</span>\n            </span>\n          </Link>\n          <button\n          onClick={() => setMobileOpen(!mobileOpen)}\n          className=\"p-1.5 text-white/70\">\n\n            {mobileOpen ? <X className=\"w-5 h-5\" /> : <Menu className=\"w-5 h-5\" />}\n          </button>\n        </div>\n\n        <AnimatePresence>\n          {mobileOpen &&\n          <motion.div\n            initial={{ opacity: 0, y: -10 }}\n            animate={{ opacity: 1, y: 0 }}\n            exit={{ opacity: 0, y: -10 }}\n            className=\"bg-black/80 backdrop-blur-2xl border-b border-white/[0.06] px-4 pb-4 pt-2\">\n\n              {NAV_LINKS.map((link, i) => {\n              const Icon = link.icon;\n              const isActive = location.pathname === link.path;\n              return (\n                <motion.div\n                  key={link.path}\n                  initial={{ opacity: 0, x: -20 }}\n                  animate={{ opacity: 1, x: 0 }}\n                  transition={{ delay: i * 0.05 }}>\n\n                    <Link\n                    to={link.path}\n                    onClick={() => setMobileOpen(false)}\n                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${\n                    isActive ?\n                    'bg-primary/10 text-primary' :\n                    'text-white/50 hover:text-white/80'}`\n                    }>\n\n                      <Icon className=\"w-4 h-4\" />\n                      <GlitchText text={link.label} className=\"text-sm font-medium\" />\n                    </Link>\n                  </motion.div>);\n\n            })}\n            </motion.div>\n          }\n        </AnimatePresence>\n      </div>\n    </>);\n\n}","encoding":"utf8"}
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, Rocket, Ship, Users, ClipboardList, Globe, Menu, X, Crosshair } from 'lucide-react';
+import GlitchText from '@/components/GlitchText';
+import { EXPO_OUT } from '@/lib/easing';
+
+const NAV_LINKS = [
+{ path: '/', icon: Rocket, label: 'Home' },
+{ path: '/ship', icon: Ship, label: 'The Ship' },
+{ path: '/crew', icon: Users, label: 'The Crew' },
+{ path: '/mission', icon: ClipboardList, label: 'Mission Info' },
+{ path: '/explore', icon: Globe, label: 'Explore Mars' },
+{ path: '/simulate', icon: Crosshair, label: 'Simulator' }];
+
+
+export default function SubPageNav() {
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <>
+      {/* Desktop nav */}
+      <motion.nav
+        initial={{ y: -80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.2, ease: EXPO_OUT }}
+        className="fixed top-0 left-0 right-0 z-50 hidden lg:block">
+
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            {/* Back home */}
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 group">
+
+              <div className="w-10 h-10 rounded-xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] flex items-center justify-center group-hover:border-primary/30 group-hover:bg-primary/[0.06] transition-all">
+                <Rocket className="w-5 h-5 text-primary -rotate-45" />
+              </div>
+              <span className="font-display text-sm font-bold text-white tracking-[0.15em]">
+                ARES<span className="text-primary">-X</span>
+              </span>
+            </Link>
+
+            <div className="h-6 w-px bg-white/[0.06]" />
+
+            {/* Nav links */}
+            <div className="flex items-center gap-1">
+              {NAV_LINKS.filter((l) => l.path !== '/').map((link) => {
+                const Icon = link.icon;
+                const isActive = location.pathname === link.path;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-display font-medium tracking-wider transition-all ${
+                    isActive ?
+                    'bg-primary/10 text-primary border border-primary/20' :
+                    'text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-transparent'}`
+                    }>
+
+                    <Icon className="w-3.5 h-3.5" />
+                    {link.label.toUpperCase()}
+                  </Link>);
+
+              })}
+            </div>
+          </div>
+
+          {/* Back to home CTA */}
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-white/30 text-xs font-display tracking-wider hover:text-primary transition-colors">
+
+            <ArrowLeft className="w-3.5 h-3.5" />
+            BACK TO HOME
+          </Link>
+        </div>
+
+        {/* Bottom border glow */}
+        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-2xl -z-10" />
+      </motion.nav>
+
+      {/* Mobile top bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50">
+        <div className="flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-2xl border-b border-white/[0.06]">
+          <Link to="/" className="flex items-center gap-2">
+            <Rocket className="w-5 h-5 text-primary -rotate-45" />
+            <span className="font-display text-sm font-bold text-white tracking-wider">
+              ARES<span className="text-primary">-X</span>
+            </span>
+          </Link>
+          <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-1.5 text-white/70">
+
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {mobileOpen &&
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-black/80 backdrop-blur-2xl border-b border-white/[0.06] px-4 pb-4 pt-2">
+
+              {NAV_LINKS.map((link, i) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.path;
+              return (
+                <motion.div
+                  key={link.path}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}>
+
+                    <Link
+                    to={link.path}
+                    onClick={() => setMobileOpen(false)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                    isActive ?
+                    'bg-primary/10 text-primary' :
+                    'text-white/50 hover:text-white/80'}`
+                    }>
+
+                      <Icon className="w-4 h-4" />
+                      <GlitchText text={link.label} className="text-sm font-medium" />
+                    </Link>
+                  </motion.div>);
+
+            })}
+            </motion.div>
+          }
+        </AnimatePresence>
+      </div>
+    </>);
+
+}

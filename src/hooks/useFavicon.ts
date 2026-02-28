@@ -1,1 +1,51 @@
-{"path":"src/hooks/useFavicon.ts","content":"import { useEffect } from 'react';\nimport { useLocation } from 'react-router';\n\n/* ================================================================\n   useFavicon — Dynamic page-specific favicon\n\n   Changes the browser tab icon based on the current route:\n     /         → 🚀 (rocket)\n     /ship     → 🛸 (spaceship)\n     /crew     → 👨‍🚀 (astronaut)\n     /mission  → 📋 (clipboard)\n     /explore  → 🌍 (globe)\n     /simulate → 🎯 (crosshair)\n     *         → 📡 (satellite)\n\n   Creates an emoji-based SVG favicon dynamically.\n   ================================================================ */\n\nconst ROUTE_EMOJI: Record<string, string> = {\n  '/': '🚀',\n  '/ship': '🛸',\n  '/crew': '👨‍🚀',\n  '/mission': '📋',\n  '/explore': '🌍',\n  '/simulate': '🎯',\n};\n\nconst DEFAULT_EMOJI = '📡';\n\nfunction createEmojiFavicon(emoji: string): string {\n  const svg = `<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><text y=\".9em\" font-size=\"80\">${emoji}</text></svg>`;\n  return `data:image/svg+xml,${encodeURIComponent(svg)}`;\n}\n\nexport function useFavicon() {\n  const { pathname } = useLocation();\n\n  useEffect(() => {\n    const emoji = ROUTE_EMOJI[pathname] || DEFAULT_EMOJI;\n    const href = createEmojiFavicon(emoji);\n\n    let link = document.querySelector<HTMLLinkElement>('link[rel=\"icon\"]');\n    if (!link) {\n      link = document.createElement('link');\n      link.rel = 'icon';\n      link.type = 'image/svg+xml';\n      document.head.appendChild(link);\n    }\n    link.href = href;\n  }, [pathname]);\n}\n","encoding":"utf8"}
+import { useEffect } from 'react';
+import { useLocation } from 'react-router';
+
+/* ================================================================
+   useFavicon — Dynamic page-specific favicon
+
+   Changes the browser tab icon based on the current route:
+     /         → 🚀 (rocket)
+     /ship     → 🛸 (spaceship)
+     /crew     → 👨‍🚀 (astronaut)
+     /mission  → 📋 (clipboard)
+     /explore  → 🌍 (globe)
+     /simulate → 🎯 (crosshair)
+     *         → 📡 (satellite)
+
+   Creates an emoji-based SVG favicon dynamically.
+   ================================================================ */
+
+const ROUTE_EMOJI: Record<string, string> = {
+  '/': '🚀',
+  '/ship': '🛸',
+  '/crew': '👨‍🚀',
+  '/mission': '📋',
+  '/explore': '🌍',
+  '/simulate': '🎯',
+};
+
+const DEFAULT_EMOJI = '📡';
+
+function createEmojiFavicon(emoji: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="80">${emoji}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+export function useFavicon() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const emoji = ROUTE_EMOJI[pathname] || DEFAULT_EMOJI;
+    const href = createEmojiFavicon(emoji);
+
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/svg+xml';
+      document.head.appendChild(link);
+    }
+    link.href = href;
+  }, [pathname]);
+}

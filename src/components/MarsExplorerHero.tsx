@@ -1,1 +1,359 @@
-{"path":"src/components/MarsExplorerHero.tsx","content":"import { useRef, useEffect, useState } from 'react';\nimport { motion } from 'framer-motion';\nimport { useGSAP } from '@gsap/react';\nimport { gsap } from '@/lib/gsap';\nimport MarsGlobe from '@/components/MarsGlobe';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { Wifi, Thermometer, MapPin, Satellite, Radio, Zap } from 'lucide-react';\n\n/**\n * MarsExplorerHero — Upgraded\n *\n * Full-viewport interactive Mars globe with:\n *   • Orbiting HUD ring with data nodes\n *   • Floating telemetry readouts\n *   • Scan sweep effect\n *   • Ambient particles\n *   • Signal connection bar\n */\n\n/* ── Telemetry data for HUD readouts ── */\nconst TELEMETRY = [\n{ icon: Thermometer, label: 'SURFACE', value: '-63°C', color: '#FF4500' },\n{ icon: MapPin, label: 'LATITUDE', value: '18.4°N', color: '#4ab8c4' },\n{ icon: Satellite, label: 'ORBIT ALT', value: '248 km', color: '#a855f7' },\n{ icon: Wifi, label: 'SIGNAL', value: '42 dBm', color: '#6b8aed' }];\n\n\n/* ── Orbiting ring nodes ── */\nconst RING_NODES = [\n{ angle: 0, label: 'NAV', active: true },\n{ angle: 45, label: 'SCI', active: true },\n{ angle: 90, label: 'COM', active: false },\n{ angle: 135, label: 'PWR', active: true },\n{ angle: 180, label: 'LIF', active: true },\n{ angle: 225, label: 'GEO', active: false },\n{ angle: 270, label: 'ATM', active: true },\n{ angle: 315, label: 'RAD', active: true }];\n\n\n/* ── Floating particles ── */\nconst PARTICLES = Array.from({ length: 30 }, (_, i) => ({\n  id: i,\n  x: 50 + (Math.sin(i * 0.8) * 42 + i % 7 * 3),\n  y: 50 + (Math.cos(i * 1.2) * 42 + i % 5 * 3),\n  size: 1 + i % 3,\n  duration: 3 + i % 5 * 2,\n  delay: i * 0.15,\n  opacity: 0.1 + i % 4 * 0.08\n}));\n\nfunction AnimatedNumber({ value, delay = 0 }: {value: string;delay?: number;}) {\n  const [display, setDisplay] = useState('---');\n  useEffect(() => {\n    const t = setTimeout(() => {\n      let step = 0;\n      const chars = '0123456789.-°CNkmdb ';\n      const interval = setInterval(() => {\n        if (step >= 8) {\n          setDisplay(value);\n          clearInterval(interval);\n          return;\n        }\n        setDisplay(\n          value.\n          split('').\n          map((c, i) => i <= step ? c : chars[Math.floor(Math.random() * chars.length)]).\n          join('')\n        );\n        step++;\n      }, 60);\n      return () => clearInterval(interval);\n    }, delay);\n    return () => clearTimeout(t);\n  }, [value, delay]);\n  return <span className=\"tabular-nums\">{display}</span>;\n}\n\nexport default function MarsExplorerHero() {\n  const ref = useRef<HTMLDivElement>(null);\n  const globeRef = useRef<HTMLDivElement>(null);\n  const [scanActive, setScanActive] = useState(false);\n\n  // Periodic scan sweep\n  useEffect(() => {\n    const interval = setInterval(() => {\n      setScanActive(true);\n      setTimeout(() => setScanActive(false), 2000);\n    }, 6000);\n    setScanActive(true);\n    setTimeout(() => setScanActive(false), 2000);\n    return () => clearInterval(interval);\n  }, []);\n\n  useGSAP(() => {\n    if (!globeRef.current) return;\n    gsap.fromTo(\n      globeRef.current,\n      { scale: 1, y: 0 },\n      {\n        scale: 0.85,\n        y: -40,\n        ease: 'none',\n        scrollTrigger: {\n          trigger: ref.current,\n          start: 'top top',\n          end: 'bottom top',\n          scrub: 1\n        }\n      }\n    );\n  }, { scope: ref });\n\n  return (\n    <section ref={ref} className=\"relative z-10 py-10 sm:py-16\">\n      {/* Ambient glow layers */}\n      <div className=\"absolute inset-0 flex items-center justify-center pointer-events-none\" aria-hidden>\n        <div className=\"w-[700px] h-[700px] rounded-full bg-primary/[0.05] blur-[140px]\" />\n      </div>\n      <div className=\"absolute inset-0 flex items-center justify-center pointer-events-none\" aria-hidden>\n        <div className=\"w-[450px] h-[450px] rounded-full bg-accent/[0.04] blur-[100px]\" />\n      </div>\n\n      {/* Main globe container */}\n      <div className=\"relative mx-auto max-w-[700px]\">\n        <motion.div\n          ref={globeRef}\n          initial={{ opacity: 0, scale: 0.7 }}\n          animate={{ opacity: 1, scale: 1 }}\n          transition={{ duration: 1.4, delay: 0.3, ease: EXPO_OUT }}\n          className=\"relative flex items-center justify-center\">\n\n          {/* ── Orbiting ring SVG ── */}\n          <div className=\"absolute inset-0 flex items-center justify-center pointer-events-none\">\n            <svg\n            viewBox=\"0 0 600 600\"\n            className=\"w-[130%] h-[130%] absolute\"\n            style={{ filter: 'drop-shadow(0 0 8px rgba(255,69,0,0.1))' }}>\n\n              {/* Outer dashed orbit */}\n              <circle\n              cx=\"300\" cy=\"300\" r=\"260\"\n              fill=\"none\" stroke=\"rgba(255,69,0,0.08)\" strokeWidth=\"1\"\n              strokeDasharray=\"4 8\">\n\n                <animateTransform\n                attributeName=\"transform\" type=\"rotate\"\n                from=\"0 300 300\" to=\"360 300 300\"\n                dur=\"60s\" repeatCount=\"indefinite\" />\n\n              </circle>\n\n              {/* Inner solid orbit */}\n              <circle\n              cx=\"300\" cy=\"300\" r=\"240\"\n              fill=\"none\" stroke=\"rgba(74,184,196,0.06)\" strokeWidth=\"0.5\">\n\n                <animateTransform\n                attributeName=\"transform\" type=\"rotate\"\n                from=\"360 300 300\" to=\"0 300 300\"\n                dur=\"45s\" repeatCount=\"indefinite\" />\n\n              </circle>\n\n              {/* Data nodes on ring */}\n              {RING_NODES.map((node, i) => {\n                const rad = node.angle * Math.PI / 180;\n                const x = 300 + Math.cos(rad) * 260;\n                const y = 300 + Math.sin(rad) * 260;\n                return (\n                  <g key={i}>\n                    <animateTransform\n                    attributeName=\"transform\" type=\"rotate\"\n                    from=\"0 300 300\" to=\"360 300 300\"\n                    dur=\"60s\" repeatCount=\"indefinite\" />\n\n                    <circle\n                    cx={x} cy={y} r={node.active ? 4 : 2.5}\n                    fill={node.active ? 'rgba(255,69,0,0.5)' : 'rgba(255,255,255,0.1)'}>\n\n                      {node.active &&\n                      <animate\n                      attributeName=\"r\" values=\"3;5;3\"\n                      dur=\"2s\" repeatCount=\"indefinite\" />\n\n                      }\n                    </circle>\n                    {node.active &&\n                    <circle\n                    cx={x} cy={y} r=\"8\"\n                    fill=\"none\" stroke=\"rgba(255,69,0,0.2)\" strokeWidth=\"0.5\">\n\n                        <animate\n                      attributeName=\"r\" values=\"6;12;6\"\n                      dur=\"2s\" repeatCount=\"indefinite\" />\n\n                        <animate\n                      attributeName=\"opacity\" values=\"0.3;0;0.3\"\n                      dur=\"2s\" repeatCount=\"indefinite\" />\n\n                      </circle>\n                    }\n                  </g>);\n\n              })}\n\n              {/* Scan sweep */}\n              {scanActive &&\n              <line\n              x1=\"300\" y1=\"300\" x2=\"300\" y2=\"40\"\n              stroke=\"rgba(74,184,196,0.3)\" strokeWidth=\"1\">\n\n                  <animateTransform\n                attributeName=\"transform\" type=\"rotate\"\n                from=\"0 300 300\" to=\"360 300 300\"\n                dur=\"2s\" fill=\"freeze\" />\n\n                </line>\n              }\n              {scanActive &&\n              <circle\n              cx=\"300\" cy=\"300\" r=\"0\"\n              fill=\"none\" stroke=\"rgba(74,184,196,0.15)\" strokeWidth=\"1\">\n\n                  <animate attributeName=\"r\" from=\"0\" to=\"280\" dur=\"2s\" fill=\"freeze\" />\n                  <animate attributeName=\"opacity\" from=\"0.4\" to=\"0\" dur=\"2s\" fill=\"freeze\" />\n                </circle>\n              }\n            </svg>\n          </div>\n\n          {/* ── Floating particles ── */}\n          <div className=\"absolute inset-0 pointer-events-none overflow-hidden\" aria-hidden>\n            {PARTICLES.map((p) =>\n            <motion.div\n              key={p.id}\n              className=\"absolute rounded-full bg-primary/40\"\n              style={{\n                width: p.size,\n                height: p.size,\n                left: `${p.x}%`,\n                top: `${p.y}%`\n              }}\n              animate={{\n                x: [0, p.id % 2 === 0 ? 20 : -20, 0],\n                y: [0, p.id % 3 === 0 ? -15 : 15, 0],\n                opacity: [0, p.opacity, 0]\n              }}\n              transition={{\n                duration: p.duration,\n                delay: p.delay,\n                repeat: Infinity,\n                ease: 'easeInOut'\n              }} />\n\n            )}\n          </div>\n\n          {/* ── The Globe ── */}\n          <MarsGlobe size={520} className=\"w-full max-w-[85vw] sm:max-w-[520px] relative z-10\" />\n        </motion.div>\n\n        {/* ── Telemetry HUD readouts ── */}\n        <div className=\"hidden sm:flex absolute inset-0 items-center justify-center pointer-events-none\" aria-hidden>\n          {/* Left side readouts */}\n          <div className=\"absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 space-y-4\">\n            {TELEMETRY.slice(0, 2).map((t, i) => {\n              const Icon = t.icon;\n              return (\n                <motion.div\n                  key={t.label}\n                  initial={{ opacity: 0, x: -20 }}\n                  animate={{ opacity: 1, x: 0 }}\n                  transition={{ duration: 0.8, delay: 1 + i * 0.2, ease: EXPO_OUT }}\n                  className=\"flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/[0.06]\">\n\n                  <Icon className=\"w-3 h-3 shrink-0\" style={{ color: t.color }} />\n                  <div className=\"flex flex-col\">\n                    <span className=\"text-[7px] font-display tracking-[0.2em] text-white/50\">{t.label}</span>\n                    <span className=\"text-xs font-display font-bold\" style={{ color: t.color }}>\n                      <AnimatedNumber value={t.value} delay={1200 + i * 300} />\n                    </span>\n                  </div>\n                </motion.div>);\n\n            })}\n          </div>\n\n          {/* Right side readouts */}\n          <div className=\"absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 space-y-4\">\n            {TELEMETRY.slice(2, 4).map((t, i) => {\n              const Icon = t.icon;\n              return (\n                <motion.div\n                  key={t.label}\n                  initial={{ opacity: 0, x: 20 }}\n                  animate={{ opacity: 1, x: 0 }}\n                  transition={{ duration: 0.8, delay: 1.4 + i * 0.2, ease: EXPO_OUT }}\n                  className=\"flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/[0.06]\">\n\n                  <Icon className=\"w-3 h-3 shrink-0\" style={{ color: t.color }} />\n                  <div className=\"flex flex-col\">\n                    <span className=\"text-[7px] font-display tracking-[0.2em] text-white/50\">{t.label}</span>\n                    <span className=\"text-xs font-display font-bold\" style={{ color: t.color }}>\n                      <AnimatedNumber value={t.value} delay={1800 + i * 300} />\n                    </span>\n                  </div>\n                </motion.div>);\n\n            })}\n          </div>\n        </div>\n\n        {/* ── Signal connection bar ── */}\n        <motion.div\n          initial={{ opacity: 0, y: 10 }}\n          animate={{ opacity: 1, y: 0 }}\n          transition={{ delay: 2, duration: 0.8 }}\n          className=\"flex items-center justify-center gap-3 mt-8\">\n\n          <div className=\"flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06]\">\n            <Radio className=\"w-3 h-3 text-green-400/60\" />\n            <div className=\"flex gap-0.5\">\n              {[...Array(5)].map((_, i) =>\n              <motion.div\n                key={i}\n                className=\"w-1 rounded-full bg-green-400/60\"\n                style={{ height: 4 + i * 3 }}\n                animate={{ opacity: [0.3, 0.8, 0.3] }}\n                transition={{\n                  duration: 1.5,\n                  delay: i * 0.1,\n                  repeat: Infinity,\n                  ease: 'easeInOut'\n                }} />\n\n              )}\n            </div>\n            <span className=\"text-[8px] font-display tracking-[0.15em] text-green-400/50 ml-1\">LINK ACTIVE</span>\n          </div>\n\n          <div className=\"flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/[0.03] border border-white/[0.06]\">\n            <Zap className=\"w-3 h-3 text-yellow-400/50\" />\n            <span className=\"text-[8px] font-display tracking-[0.15em] text-yellow-400/40\">PWR 98%</span>\n          </div>\n        </motion.div>\n      </div>\n\n      {/* Instruction hint */}\n      <motion.p\n        initial={{ opacity: 0 }}\n        animate={{ opacity: 1 }}\n        transition={{ delay: 2.5, duration: 0.8 }}\n        className=\"text-center text-[10px] sm:text-xs font-display tracking-[0.25em] text-white/50 mt-6 sm:mt-10\">\n\n        INTERACTIVE GLOBE · CLICK LANDING ZONES FOR DETAILS\n      </motion.p>\n    </section>);\n\n}","encoding":"utf8"}
+import { useRef, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { useGSAP } from '@gsap/react';
+import { gsap } from '@/lib/gsap';
+import MarsGlobe from '@/components/MarsGlobe';
+import { EXPO_OUT } from '@/lib/easing';
+import { Wifi, Thermometer, MapPin, Satellite, Radio, Zap } from 'lucide-react';
+
+/**
+ * MarsExplorerHero — Upgraded
+ *
+ * Full-viewport interactive Mars globe with:
+ *   • Orbiting HUD ring with data nodes
+ *   • Floating telemetry readouts
+ *   • Scan sweep effect
+ *   • Ambient particles
+ *   • Signal connection bar
+ */
+
+/* ── Telemetry data for HUD readouts ── */
+const TELEMETRY = [
+{ icon: Thermometer, label: 'SURFACE', value: '-63°C', color: '#FF4500' },
+{ icon: MapPin, label: 'LATITUDE', value: '18.4°N', color: '#4ab8c4' },
+{ icon: Satellite, label: 'ORBIT ALT', value: '248 km', color: '#a855f7' },
+{ icon: Wifi, label: 'SIGNAL', value: '42 dBm', color: '#6b8aed' }];
+
+
+/* ── Orbiting ring nodes ── */
+const RING_NODES = [
+{ angle: 0, label: 'NAV', active: true },
+{ angle: 45, label: 'SCI', active: true },
+{ angle: 90, label: 'COM', active: false },
+{ angle: 135, label: 'PWR', active: true },
+{ angle: 180, label: 'LIF', active: true },
+{ angle: 225, label: 'GEO', active: false },
+{ angle: 270, label: 'ATM', active: true },
+{ angle: 315, label: 'RAD', active: true }];
+
+
+/* ── Floating particles ── */
+const PARTICLES = Array.from({ length: 30 }, (_, i) => ({
+  id: i,
+  x: 50 + (Math.sin(i * 0.8) * 42 + i % 7 * 3),
+  y: 50 + (Math.cos(i * 1.2) * 42 + i % 5 * 3),
+  size: 1 + i % 3,
+  duration: 3 + i % 5 * 2,
+  delay: i * 0.15,
+  opacity: 0.1 + i % 4 * 0.08
+}));
+
+function AnimatedNumber({ value, delay = 0 }: {value: string;delay?: number;}) {
+  const [display, setDisplay] = useState('---');
+  useEffect(() => {
+    const t = setTimeout(() => {
+      let step = 0;
+      const chars = '0123456789.-°CNkmdb ';
+      const interval = setInterval(() => {
+        if (step >= 8) {
+          setDisplay(value);
+          clearInterval(interval);
+          return;
+        }
+        setDisplay(
+          value.
+          split('').
+          map((c, i) => i <= step ? c : chars[Math.floor(Math.random() * chars.length)]).
+          join('')
+        );
+        step++;
+      }, 60);
+      return () => clearInterval(interval);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return <span className="tabular-nums">{display}</span>;
+}
+
+export default function MarsExplorerHero() {
+  const ref = useRef<HTMLDivElement>(null);
+  const globeRef = useRef<HTMLDivElement>(null);
+  const [scanActive, setScanActive] = useState(false);
+
+  // Periodic scan sweep
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setScanActive(true);
+      setTimeout(() => setScanActive(false), 2000);
+    }, 6000);
+    setScanActive(true);
+    setTimeout(() => setScanActive(false), 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useGSAP(() => {
+    if (!globeRef.current) return;
+    gsap.fromTo(
+      globeRef.current,
+      { scale: 1, y: 0 },
+      {
+        scale: 0.85,
+        y: -40,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: ref.current,
+          start: 'top top',
+          end: 'bottom top',
+          scrub: 1
+        }
+      }
+    );
+  }, { scope: ref });
+
+  return (
+    <section ref={ref} className="relative z-10 py-10 sm:py-16">
+      {/* Ambient glow layers */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
+        <div className="w-[700px] h-[700px] rounded-full bg-primary/[0.05] blur-[140px]" />
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
+        <div className="w-[450px] h-[450px] rounded-full bg-accent/[0.04] blur-[100px]" />
+      </div>
+
+      {/* Main globe container */}
+      <div className="relative mx-auto max-w-[700px]">
+        <motion.div
+          ref={globeRef}
+          initial={{ opacity: 0, scale: 0.7 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.4, delay: 0.3, ease: EXPO_OUT }}
+          className="relative flex items-center justify-center">
+
+          {/* ── Orbiting ring SVG ── */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <svg
+            viewBox="0 0 600 600"
+            className="w-[130%] h-[130%] absolute"
+            style={{ filter: 'drop-shadow(0 0 8px rgba(255,69,0,0.1))' }}>
+
+              {/* Outer dashed orbit */}
+              <circle
+              cx="300" cy="300" r="260"
+              fill="none" stroke="rgba(255,69,0,0.08)" strokeWidth="1"
+              strokeDasharray="4 8">
+
+                <animateTransform
+                attributeName="transform" type="rotate"
+                from="0 300 300" to="360 300 300"
+                dur="60s" repeatCount="indefinite" />
+
+              </circle>
+
+              {/* Inner solid orbit */}
+              <circle
+              cx="300" cy="300" r="240"
+              fill="none" stroke="rgba(74,184,196,0.06)" strokeWidth="0.5">
+
+                <animateTransform
+                attributeName="transform" type="rotate"
+                from="360 300 300" to="0 300 300"
+                dur="45s" repeatCount="indefinite" />
+
+              </circle>
+
+              {/* Data nodes on ring */}
+              {RING_NODES.map((node, i) => {
+                const rad = node.angle * Math.PI / 180;
+                const x = 300 + Math.cos(rad) * 260;
+                const y = 300 + Math.sin(rad) * 260;
+                return (
+                  <g key={i}>
+                    <animateTransform
+                    attributeName="transform" type="rotate"
+                    from="0 300 300" to="360 300 300"
+                    dur="60s" repeatCount="indefinite" />
+
+                    <circle
+                    cx={x} cy={y} r={node.active ? 4 : 2.5}
+                    fill={node.active ? 'rgba(255,69,0,0.5)' : 'rgba(255,255,255,0.1)'}>
+
+                      {node.active &&
+                      <animate
+                      attributeName="r" values="3;5;3"
+                      dur="2s" repeatCount="indefinite" />
+
+                      }
+                    </circle>
+                    {node.active &&
+                    <circle
+                    cx={x} cy={y} r="8"
+                    fill="none" stroke="rgba(255,69,0,0.2)" strokeWidth="0.5">
+
+                        <animate
+                      attributeName="r" values="6;12;6"
+                      dur="2s" repeatCount="indefinite" />
+
+                        <animate
+                      attributeName="opacity" values="0.3;0;0.3"
+                      dur="2s" repeatCount="indefinite" />
+
+                      </circle>
+                    }
+                  </g>);
+
+              })}
+
+              {/* Scan sweep */}
+              {scanActive &&
+              <line
+              x1="300" y1="300" x2="300" y2="40"
+              stroke="rgba(74,184,196,0.3)" strokeWidth="1">
+
+                  <animateTransform
+                attributeName="transform" type="rotate"
+                from="0 300 300" to="360 300 300"
+                dur="2s" fill="freeze" />
+
+                </line>
+              }
+              {scanActive &&
+              <circle
+              cx="300" cy="300" r="0"
+              fill="none" stroke="rgba(74,184,196,0.15)" strokeWidth="1">
+
+                  <animate attributeName="r" from="0" to="280" dur="2s" fill="freeze" />
+                  <animate attributeName="opacity" from="0.4" to="0" dur="2s" fill="freeze" />
+                </circle>
+              }
+            </svg>
+          </div>
+
+          {/* ── Floating particles ── */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+            {PARTICLES.map((p) =>
+            <motion.div
+              key={p.id}
+              className="absolute rounded-full bg-primary/40"
+              style={{
+                width: p.size,
+                height: p.size,
+                left: `${p.x}%`,
+                top: `${p.y}%`
+              }}
+              animate={{
+                x: [0, p.id % 2 === 0 ? 20 : -20, 0],
+                y: [0, p.id % 3 === 0 ? -15 : 15, 0],
+                opacity: [0, p.opacity, 0]
+              }}
+              transition={{
+                duration: p.duration,
+                delay: p.delay,
+                repeat: Infinity,
+                ease: 'easeInOut'
+              }} />
+
+            )}
+          </div>
+
+          {/* ── The Globe ── */}
+          <MarsGlobe size={520} className="w-full max-w-[85vw] sm:max-w-[520px] relative z-10" />
+        </motion.div>
+
+        {/* ── Telemetry HUD readouts ── */}
+        <div className="hidden sm:flex absolute inset-0 items-center justify-center pointer-events-none" aria-hidden>
+          {/* Left side readouts */}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 space-y-4">
+            {TELEMETRY.slice(0, 2).map((t, i) => {
+              const Icon = t.icon;
+              return (
+                <motion.div
+                  key={t.label}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 1 + i * 0.2, ease: EXPO_OUT }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/[0.06]">
+
+                  <Icon className="w-3 h-3 shrink-0" style={{ color: t.color }} />
+                  <div className="flex flex-col">
+                    <span className="text-[7px] font-display tracking-[0.2em] text-white/50">{t.label}</span>
+                    <span className="text-xs font-display font-bold" style={{ color: t.color }}>
+                      <AnimatedNumber value={t.value} delay={1200 + i * 300} />
+                    </span>
+                  </div>
+                </motion.div>);
+
+            })}
+          </div>
+
+          {/* Right side readouts */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 space-y-4">
+            {TELEMETRY.slice(2, 4).map((t, i) => {
+              const Icon = t.icon;
+              return (
+                <motion.div
+                  key={t.label}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: 1.4 + i * 0.2, ease: EXPO_OUT }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 backdrop-blur-md border border-white/[0.06]">
+
+                  <Icon className="w-3 h-3 shrink-0" style={{ color: t.color }} />
+                  <div className="flex flex-col">
+                    <span className="text-[7px] font-display tracking-[0.2em] text-white/50">{t.label}</span>
+                    <span className="text-xs font-display font-bold" style={{ color: t.color }}>
+                      <AnimatedNumber value={t.value} delay={1800 + i * 300} />
+                    </span>
+                  </div>
+                </motion.div>);
+
+            })}
+          </div>
+        </div>
+
+        {/* ── Signal connection bar ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2, duration: 0.8 }}
+          className="flex items-center justify-center gap-3 mt-8">
+
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06]">
+            <Radio className="w-3 h-3 text-green-400/60" />
+            <div className="flex gap-0.5">
+              {[...Array(5)].map((_, i) =>
+              <motion.div
+                key={i}
+                className="w-1 rounded-full bg-green-400/60"
+                style={{ height: 4 + i * 3 }}
+                animate={{ opacity: [0.3, 0.8, 0.3] }}
+                transition={{
+                  duration: 1.5,
+                  delay: i * 0.1,
+                  repeat: Infinity,
+                  ease: 'easeInOut'
+                }} />
+
+              )}
+            </div>
+            <span className="text-[8px] font-display tracking-[0.15em] text-green-400/50 ml-1">LINK ACTIVE</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/[0.03] border border-white/[0.06]">
+            <Zap className="w-3 h-3 text-yellow-400/50" />
+            <span className="text-[8px] font-display tracking-[0.15em] text-yellow-400/40">PWR 98%</span>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Instruction hint */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 2.5, duration: 0.8 }}
+        className="text-center text-[10px] sm:text-xs font-display tracking-[0.25em] text-white/50 mt-6 sm:mt-10">
+
+        INTERACTIVE GLOBE · CLICK LANDING ZONES FOR DETAILS
+      </motion.p>
+    </section>);
+
+}

@@ -1,1 +1,179 @@
-{"path":"src/lib/biometric-lottie.ts","content":"/**\n * Hand-crafted Lottie animation data for a biometric pulse-scan effect.\n *\n * Layers:\n *   1. Outer expanding ring  (frame 0–60, scale 25%→110%, opacity 85%→0%)\n *   2. Middle expanding ring (frame 12–58, scale 18%→90%, opacity 65%→0%)\n *   3. Inner expanding ring  (frame 22–54, scale 12%→72%, opacity 50%→0%)\n *   4. Centre pulse dot      (frame 0–60, pulsing scale + opacity)\n *\n * Canvas: 200×200 px, 30 fps, 60 frames (2 s)\n * Colours: ARES-X Mars red / accent orange\n */\n\nconst MARS_RED = [1, 0.271, 0, 1] as const;\nconst ACCENT_ORANGE = [1, 0.42, 0.208, 1] as const;\n\n/* Helper — builds a shape-layer with one stroked ellipse */\nfunction ringLayer(\n  ind: number,\n  name: string,\n  inFrame: number,\n  outFrame: number,\n  startScale: number,\n  endScale: number,\n  startOpacity: number,\n  strokeColor: readonly [number, number, number, number],\n  strokeWidth: number,\n) {\n  return {\n    ddd: 0,\n    ind,\n    ty: 4,\n    nm: name,\n    sr: 1,\n    ks: {\n      o: {\n        a: 1,\n        k: [\n          { i: { x: [0.4], y: [1] }, o: { x: [0.6], y: [0] }, t: inFrame, s: [startOpacity] },\n          { t: outFrame, s: [0] },\n        ],\n      },\n      r: { a: 0, k: 0 },\n      p: { a: 0, k: [100, 100, 0] },\n      a: { a: 0, k: [0, 0, 0] },\n      s: {\n        a: 1,\n        k: [\n          {\n            i: { x: [0.4, 0.4, 0.67], y: [1, 1, 1] },\n            o: { x: [0.6, 0.6, 0.33], y: [0, 0, 0] },\n            t: inFrame,\n            s: [startScale, startScale, 100],\n          },\n          { t: outFrame, s: [endScale, endScale, 100] },\n        ],\n      },\n    },\n    ao: 0,\n    shapes: [\n      {\n        ty: 'gr',\n        it: [\n          { ty: 'el', d: 1, s: { a: 0, k: [160, 160] }, p: { a: 0, k: [0, 0] }, nm: 'Ellipse' },\n          {\n            ty: 'st',\n            c: { a: 0, k: [...strokeColor] },\n            o: { a: 0, k: 100 },\n            w: { a: 0, k: strokeWidth },\n            lc: 2,\n            lj: 2,\n            nm: 'Stroke',\n          },\n          {\n            ty: 'tr',\n            p: { a: 0, k: [0, 0] },\n            a: { a: 0, k: [0, 0] },\n            s: { a: 0, k: [100, 100] },\n            r: { a: 0, k: 0 },\n            o: { a: 0, k: 100 },\n          },\n        ],\n        nm: 'Group',\n      },\n    ],\n    ip: inFrame,\n    op: outFrame + 1,\n    st: inFrame,\n    bm: 0,\n  };\n}\n\nexport const biometricScanData = {\n  v: '5.7.1',\n  fr: 30,\n  ip: 0,\n  op: 60,\n  w: 200,\n  h: 200,\n  nm: 'Biometric Scan',\n  ddd: 0,\n  assets: [] as unknown[],\n  layers: [\n    // 1 — Outer ring\n    ringLayer(1, 'Ring Outer', 0, 60, 25, 110, 85, MARS_RED, 2.5),\n    // 2 — Middle ring\n    ringLayer(2, 'Ring Mid', 12, 58, 18, 90, 65, MARS_RED, 2),\n    // 3 — Inner ring\n    ringLayer(3, 'Ring Inner', 22, 54, 12, 72, 50, ACCENT_ORANGE, 1.5),\n    // 4 — Centre pulse dot\n    {\n      ddd: 0,\n      ind: 4,\n      ty: 4,\n      nm: 'Center Dot',\n      sr: 1,\n      ks: {\n        o: {\n          a: 1,\n          k: [\n            { i: { x: [0.4], y: [1] }, o: { x: [0.6], y: [0] }, t: 0, s: [100] },\n            { i: { x: [0.4], y: [1] }, o: { x: [0.6], y: [0] }, t: 30, s: [35] },\n            { t: 60, s: [100] },\n          ],\n        },\n        r: { a: 0, k: 0 },\n        p: { a: 0, k: [100, 100, 0] },\n        a: { a: 0, k: [0, 0, 0] },\n        s: {\n          a: 1,\n          k: [\n            {\n              i: { x: [0.4, 0.4, 0.67], y: [1, 1, 1] },\n              o: { x: [0.6, 0.6, 0.33], y: [0, 0, 0] },\n              t: 0,\n              s: [100, 100, 100],\n            },\n            {\n              i: { x: [0.4, 0.4, 0.67], y: [1, 1, 1] },\n              o: { x: [0.6, 0.6, 0.33], y: [0, 0, 0] },\n              t: 30,\n              s: [60, 60, 100],\n            },\n            { t: 60, s: [100, 100, 100] },\n          ],\n        },\n      },\n      ao: 0,\n      shapes: [\n        {\n          ty: 'gr',\n          it: [\n            { ty: 'el', d: 1, s: { a: 0, k: [24, 24] }, p: { a: 0, k: [0, 0] }, nm: 'Dot' },\n            {\n              ty: 'fl',\n              c: { a: 0, k: [...MARS_RED] },\n              o: { a: 0, k: 100 },\n              r: 1,\n              nm: 'Fill',\n            },\n            {\n              ty: 'tr',\n              p: { a: 0, k: [0, 0] },\n              a: { a: 0, k: [0, 0] },\n              s: { a: 0, k: [100, 100] },\n              r: { a: 0, k: 0 },\n              o: { a: 0, k: 100 },\n            },\n          ],\n          nm: 'Group',\n        },\n      ],\n      ip: 0,\n      op: 60,\n      st: 0,\n      bm: 0,\n    },\n  ],\n};\n","encoding":"utf8"}
+/**
+ * Hand-crafted Lottie animation data for a biometric pulse-scan effect.
+ *
+ * Layers:
+ *   1. Outer expanding ring  (frame 0–60, scale 25%→110%, opacity 85%→0%)
+ *   2. Middle expanding ring (frame 12–58, scale 18%→90%, opacity 65%→0%)
+ *   3. Inner expanding ring  (frame 22–54, scale 12%→72%, opacity 50%→0%)
+ *   4. Centre pulse dot      (frame 0–60, pulsing scale + opacity)
+ *
+ * Canvas: 200×200 px, 30 fps, 60 frames (2 s)
+ * Colours: ARES-X Mars red / accent orange
+ */
+
+const MARS_RED = [1, 0.271, 0, 1] as const;
+const ACCENT_ORANGE = [1, 0.42, 0.208, 1] as const;
+
+/* Helper — builds a shape-layer with one stroked ellipse */
+function ringLayer(
+  ind: number,
+  name: string,
+  inFrame: number,
+  outFrame: number,
+  startScale: number,
+  endScale: number,
+  startOpacity: number,
+  strokeColor: readonly [number, number, number, number],
+  strokeWidth: number,
+) {
+  return {
+    ddd: 0,
+    ind,
+    ty: 4,
+    nm: name,
+    sr: 1,
+    ks: {
+      o: {
+        a: 1,
+        k: [
+          { i: { x: [0.4], y: [1] }, o: { x: [0.6], y: [0] }, t: inFrame, s: [startOpacity] },
+          { t: outFrame, s: [0] },
+        ],
+      },
+      r: { a: 0, k: 0 },
+      p: { a: 0, k: [100, 100, 0] },
+      a: { a: 0, k: [0, 0, 0] },
+      s: {
+        a: 1,
+        k: [
+          {
+            i: { x: [0.4, 0.4, 0.67], y: [1, 1, 1] },
+            o: { x: [0.6, 0.6, 0.33], y: [0, 0, 0] },
+            t: inFrame,
+            s: [startScale, startScale, 100],
+          },
+          { t: outFrame, s: [endScale, endScale, 100] },
+        ],
+      },
+    },
+    ao: 0,
+    shapes: [
+      {
+        ty: 'gr',
+        it: [
+          { ty: 'el', d: 1, s: { a: 0, k: [160, 160] }, p: { a: 0, k: [0, 0] }, nm: 'Ellipse' },
+          {
+            ty: 'st',
+            c: { a: 0, k: [...strokeColor] },
+            o: { a: 0, k: 100 },
+            w: { a: 0, k: strokeWidth },
+            lc: 2,
+            lj: 2,
+            nm: 'Stroke',
+          },
+          {
+            ty: 'tr',
+            p: { a: 0, k: [0, 0] },
+            a: { a: 0, k: [0, 0] },
+            s: { a: 0, k: [100, 100] },
+            r: { a: 0, k: 0 },
+            o: { a: 0, k: 100 },
+          },
+        ],
+        nm: 'Group',
+      },
+    ],
+    ip: inFrame,
+    op: outFrame + 1,
+    st: inFrame,
+    bm: 0,
+  };
+}
+
+export const biometricScanData = {
+  v: '5.7.1',
+  fr: 30,
+  ip: 0,
+  op: 60,
+  w: 200,
+  h: 200,
+  nm: 'Biometric Scan',
+  ddd: 0,
+  assets: [] as unknown[],
+  layers: [
+    // 1 — Outer ring
+    ringLayer(1, 'Ring Outer', 0, 60, 25, 110, 85, MARS_RED, 2.5),
+    // 2 — Middle ring
+    ringLayer(2, 'Ring Mid', 12, 58, 18, 90, 65, MARS_RED, 2),
+    // 3 — Inner ring
+    ringLayer(3, 'Ring Inner', 22, 54, 12, 72, 50, ACCENT_ORANGE, 1.5),
+    // 4 — Centre pulse dot
+    {
+      ddd: 0,
+      ind: 4,
+      ty: 4,
+      nm: 'Center Dot',
+      sr: 1,
+      ks: {
+        o: {
+          a: 1,
+          k: [
+            { i: { x: [0.4], y: [1] }, o: { x: [0.6], y: [0] }, t: 0, s: [100] },
+            { i: { x: [0.4], y: [1] }, o: { x: [0.6], y: [0] }, t: 30, s: [35] },
+            { t: 60, s: [100] },
+          ],
+        },
+        r: { a: 0, k: 0 },
+        p: { a: 0, k: [100, 100, 0] },
+        a: { a: 0, k: [0, 0, 0] },
+        s: {
+          a: 1,
+          k: [
+            {
+              i: { x: [0.4, 0.4, 0.67], y: [1, 1, 1] },
+              o: { x: [0.6, 0.6, 0.33], y: [0, 0, 0] },
+              t: 0,
+              s: [100, 100, 100],
+            },
+            {
+              i: { x: [0.4, 0.4, 0.67], y: [1, 1, 1] },
+              o: { x: [0.6, 0.6, 0.33], y: [0, 0, 0] },
+              t: 30,
+              s: [60, 60, 100],
+            },
+            { t: 60, s: [100, 100, 100] },
+          ],
+        },
+      },
+      ao: 0,
+      shapes: [
+        {
+          ty: 'gr',
+          it: [
+            { ty: 'el', d: 1, s: { a: 0, k: [24, 24] }, p: { a: 0, k: [0, 0] }, nm: 'Dot' },
+            {
+              ty: 'fl',
+              c: { a: 0, k: [...MARS_RED] },
+              o: { a: 0, k: 100 },
+              r: 1,
+              nm: 'Fill',
+            },
+            {
+              ty: 'tr',
+              p: { a: 0, k: [0, 0] },
+              a: { a: 0, k: [0, 0] },
+              s: { a: 0, k: [100, 100] },
+              r: { a: 0, k: 0 },
+              o: { a: 0, k: 100 },
+            },
+          ],
+          nm: 'Group',
+        },
+      ],
+      ip: 0,
+      op: 60,
+      st: 0,
+      bm: 0,
+    },
+  ],
+};

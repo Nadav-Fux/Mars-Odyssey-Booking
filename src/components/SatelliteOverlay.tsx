@@ -1,1 +1,280 @@
-{"path":"src/components/SatelliteOverlay.tsx","content":"import { memo } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useSatelliteMode } from '@/hooks/useSatelliteMode';\n\n/**\n * SatelliteOverlay\n *\n * When satellite mode is active this renders:\n *  1. Global CSS overrides that swap glassmorphism → high-contrast dark panels\n *  2. A coordinate grid overlay\n *  3. HUD corner readouts\n *  4. Scan-line and vignette effects\n */\n\n// ─── Satellite-mode global CSS overrides ────────────────────────\n// Targets elements inside .satellite-mode to swap the visual language\n// from artistic glassmorphism → tactical satellite imagery.\nconst overrideCSS = `\n/* ══ BASE ══ */\n.satellite-mode {\n  --sat-panel: rgba(6,8,14,0.92);\n  --sat-border: rgba(0,220,255,0.12);\n  --sat-accent: #00dcff;\n  --sat-accent-dim: rgba(0,220,255,0.35);\n  --sat-text: #c8f0ff;\n  --sat-text-dim: rgba(160,210,230,0.4);\n  --sat-grid: rgba(0,200,240,0.04);\n}\n\n/* ══ GLASSMORPHISM → OPAQUE DARK PANELS ══ */\n.satellite-mode [class*=\"backdrop-blur\"] {\n  -webkit-backdrop-filter: none !important;\n  backdrop-filter: none !important;\n}\n\n/* Glass card backgrounds → solid dark */\n.satellite-mode .absolute.inset-0[class*=\"bg-white\"][class*=\"border\"][class*=\"rounded\"] {\n  background: var(--sat-panel) !important;\n  border-color: var(--sat-border) !important;\n  box-shadow: inset 0 1px 0 rgba(0,220,255,0.06), 0 0 20px rgba(0,220,255,0.03) !important;\n}\n\n/* ══ TYPOGRAPHY ══ */\n.satellite-mode .text-primary,\n.satellite-mode .text-primary\\/90 {\n  color: var(--sat-accent) !important;\n}\n.satellite-mode [class*=\"text-white\"][class*=\"/\"] {\n  filter: brightness(1.15) saturate(0.3);\n}\n\n/* Gradient text → solid cyan */\n.satellite-mode .bg-clip-text {\n  -webkit-text-fill-color: var(--sat-accent) !important;\n  background: none !important;\n}\n\n/* ══ BORDERS ══ */\n.satellite-mode [class*=\"border-white\"] {\n  border-color: var(--sat-border) !important;\n}\n.satellite-mode [class*=\"border-primary\"] {\n  border-color: var(--sat-accent-dim) !important;\n}\n\n/* ══ GLOWS / AMBIENT → suppressed ══ */\n.satellite-mode [class*=\"blur-\\\\[120px\\\\]\"],\n.satellite-mode [class*=\"blur-\\\\[100px\\\\]\"] {\n  opacity: 0 !important;\n}\n\n/* ══ BUTTONS ══ */\n.satellite-mode [class*=\"bg-gradient-to-r\"][class*=\"from-primary\"] {\n  background: var(--sat-accent) !important;\n  opacity: 0.9;\n}\n.satellite-mode button[class*=\"bg-white\"] {\n  background: rgba(0,220,255,0.06) !important;\n  border-color: var(--sat-border) !important;\n}\n\n/* ══ NEBULA → hidden ══ */\n.satellite-mode [data-nebula-cloud] {\n  opacity: 0 !important;\n  transition: opacity 0.8s ease;\n}\n\n/* ══ FONTS → monospace feel ══ */\n.satellite-mode .font-display {\n  letter-spacing: 0.08em;\n}\n\n/* ══ Primary color badge/overline ══ */\n.satellite-mode [class*=\"bg-primary\"] {\n  background-color: rgba(0,220,255,0.08) !important;\n  border-color: rgba(0,220,255,0.2) !important;\n}\n\n/* ══ Transition everything smoothly ══ */\n.satellite-mode *,\n.satellite-mode *::before,\n.satellite-mode *::after {\n  transition-property: background-color, border-color, color, opacity, box-shadow, filter;\n  transition-duration: 0.6s;\n  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);\n}\n`;\n\nfunction SatelliteOverlay() {\n  const { satellite } = useSatelliteMode();\n\n  return (\n    <>\n      {/* Inject override CSS (always present, only targets .satellite-mode) */}\n      <style dangerouslySetInnerHTML={{ __html: overrideCSS }} />\n\n      <AnimatePresence>\n        {satellite &&\n        <>\n            {/* ── Coordinate grid ── */}\n            <motion.div\n            className=\"fixed inset-0 pointer-events-none z-[2]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 1 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: 0.8, ease: EXPO_OUT }}\n            aria-hidden=\"true\">\n\n              {/* Grid lines */}\n              <div\n            className=\"absolute inset-0\"\n            style={{\n              backgroundImage: `\n                    linear-gradient(rgba(0,220,255,0.035) 1px, transparent 1px),\n                    linear-gradient(90deg, rgba(0,220,255,0.035) 1px, transparent 1px)\n                  `,\n              backgroundSize: '80px 80px'\n            }} />\n\n              {/* Finer sub-grid */}\n              <div\n            className=\"absolute inset-0\"\n            style={{\n              backgroundImage: `\n                    linear-gradient(rgba(0,220,255,0.012) 1px, transparent 1px),\n                    linear-gradient(90deg, rgba(0,220,255,0.012) 1px, transparent 1px)\n                  `,\n              backgroundSize: '20px 20px'\n            }} />\n\n            </motion.div>\n\n            {/* ── Dark vignette ── */}\n            <motion.div\n            className=\"fixed inset-0 pointer-events-none z-[2]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 1 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: 0.8, ease: EXPO_OUT }}\n            style={{\n              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.4) 100%)'\n            }} />\n\n\n            {/* ── Scan line ── */}\n            <motion.div\n            className=\"fixed inset-0 pointer-events-none z-[3] overflow-hidden\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 1 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: 0.5, ease: EXPO_OUT }}>\n\n              <motion.div\n              className=\"absolute left-0 right-0 h-[2px]\"\n              style={{\n                background: 'linear-gradient(90deg, transparent 5%, rgba(0,220,255,0.12) 30%, rgba(0,220,255,0.2) 50%, rgba(0,220,255,0.12) 70%, transparent 95%)',\n                boxShadow: '0 0 30px rgba(0,220,255,0.1)'\n              }}\n              animate={{ top: ['-2px', '100vh', '-2px'] }}\n              transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} />\n\n            </motion.div>\n\n            {/* ── CRT faint scanlines ── */}\n            <motion.div\n            className=\"fixed inset-0 pointer-events-none z-[2]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 0.015 }}\n            exit={{ opacity: 0 }}\n            style={{\n              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,220,255,0.08) 3px, rgba(0,220,255,0.08) 4px)'\n            }} />\n\n\n            {/* ── HUD corner markers ── */}\n            <motion.div\n            className=\"fixed inset-0 pointer-events-none z-[4]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: 1 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: 0.6, delay: 0.3, ease: EXPO_OUT }}>\n\n              {/* Top-left */}\n              <div className=\"absolute top-4 left-4 lg:left-20\">\n                <svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" fill=\"none\">\n                  <path d=\"M2 16 L2 2 L16 2\" stroke=\"rgba(0,220,255,0.4)\" strokeWidth=\"1\" />\n                </svg>\n                <div className=\"mt-1 text-[8px] font-display tracking-[0.2em]\" style={{ color: 'rgba(0,220,255,0.3)' }}>\n                  ORBITAL VIEW\n                </div>\n              </div>\n              {/* Top-right */}\n              <div className=\"absolute top-4 right-4\">\n                <svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" fill=\"none\" className=\"ml-auto\">\n                  <path d=\"M46 16 L46 2 L32 2\" stroke=\"rgba(0,220,255,0.4)\" strokeWidth=\"1\" />\n                </svg>\n                <div className=\"mt-1 text-[8px] font-display tracking-[0.2em] text-right\" style={{ color: 'rgba(0,220,255,0.3)' }}>\n                  SAT-7 FEED\n                </div>\n              </div>\n              {/* Bottom-left */}\n              <div className=\"absolute bottom-4 left-4 lg:left-20\">\n                <div className=\"mb-1 text-[8px] font-display tracking-[0.2em]\" style={{ color: 'rgba(0,220,255,0.3)' }}>\n                  4.6°N 137.4°E\n                </div>\n                <svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" fill=\"none\">\n                  <path d=\"M2 32 L2 46 L16 46\" stroke=\"rgba(0,220,255,0.4)\" strokeWidth=\"1\" />\n                </svg>\n              </div>\n              {/* Bottom-right */}\n              <div className=\"absolute bottom-4 right-4\">\n                <div className=\"mb-1 text-[8px] font-display tracking-[0.2em] text-right\" style={{ color: 'rgba(0,220,255,0.3)' }}>\n                  ALT 410km\n                </div>\n                <svg width=\"48\" height=\"48\" viewBox=\"0 0 48 48\" fill=\"none\" className=\"ml-auto\">\n                  <path d=\"M46 32 L46 46 L32 46\" stroke=\"rgba(0,220,255,0.4)\" strokeWidth=\"1\" />\n                </svg>\n              </div>\n\n              {/* Center crosshair */}\n              <div className=\"absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden lg:block\">\n                <svg width=\"64\" height=\"64\" viewBox=\"0 0 64 64\" fill=\"none\">\n                  <circle cx=\"32\" cy=\"32\" r=\"16\" stroke=\"rgba(0,220,255,0.08)\" strokeWidth=\"0.5\" />\n                  <circle cx=\"32\" cy=\"32\" r=\"4\" stroke=\"rgba(0,220,255,0.15)\" strokeWidth=\"0.5\" />\n                  <line x1=\"32\" y1=\"0\" x2=\"32\" y2=\"24\" stroke=\"rgba(0,220,255,0.06)\" strokeWidth=\"0.5\" />\n                  <line x1=\"32\" y1=\"40\" x2=\"32\" y2=\"64\" stroke=\"rgba(0,220,255,0.06)\" strokeWidth=\"0.5\" />\n                  <line x1=\"0\" y1=\"32\" x2=\"24\" y2=\"32\" stroke=\"rgba(0,220,255,0.06)\" strokeWidth=\"0.5\" />\n                  <line x1=\"40\" y1=\"32\" x2=\"64\" y2=\"32\" stroke=\"rgba(0,220,255,0.06)\" strokeWidth=\"0.5\" />\n                </svg>\n              </div>\n\n              {/* Side telemetry strip */}\n              <div className=\"absolute right-4 top-1/2 -translate-y-1/2 space-y-4 hidden lg:block\">\n                {[\n              { label: 'INCLINATION', value: '25.19°' },\n              { label: 'GROUND SPEED', value: '7.66 km/s' },\n              { label: 'RESOLUTION', value: '0.5m/px' },\n              { label: 'BAND', value: 'VNIR+SWIR' },\n              { label: 'LOCAL TIME', value: '14:32 MST' }].\n              map((d) =>\n              <div key={d.label} className=\"text-right\">\n                    <div className=\"text-[7px] font-display tracking-[0.15em]\" style={{ color: 'rgba(0,220,255,0.2)' }}>\n                      {d.label}\n                    </div>\n                    <div className=\"text-[10px] font-display font-bold\" style={{ color: 'rgba(0,220,255,0.5)' }}>\n                      {d.value}\n                    </div>\n                  </div>\n              )}\n              </div>\n            </motion.div>\n          </>\n        }\n      </AnimatePresence>\n    </>);\n\n}\n\nexport default memo(SatelliteOverlay);","encoding":"utf8"}
+import { memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+import { useSatelliteMode } from '@/hooks/useSatelliteMode';
+
+/**
+ * SatelliteOverlay
+ *
+ * When satellite mode is active this renders:
+ *  1. Global CSS overrides that swap glassmorphism → high-contrast dark panels
+ *  2. A coordinate grid overlay
+ *  3. HUD corner readouts
+ *  4. Scan-line and vignette effects
+ */
+
+// ─── Satellite-mode global CSS overrides ────────────────────────
+// Targets elements inside .satellite-mode to swap the visual language
+// from artistic glassmorphism → tactical satellite imagery.
+const overrideCSS = `
+/* ══ BASE ══ */
+.satellite-mode {
+  --sat-panel: rgba(6,8,14,0.92);
+  --sat-border: rgba(0,220,255,0.12);
+  --sat-accent: #00dcff;
+  --sat-accent-dim: rgba(0,220,255,0.35);
+  --sat-text: #c8f0ff;
+  --sat-text-dim: rgba(160,210,230,0.4);
+  --sat-grid: rgba(0,200,240,0.04);
+}
+
+/* ══ GLASSMORPHISM → OPAQUE DARK PANELS ══ */
+.satellite-mode [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Glass card backgrounds → solid dark */
+.satellite-mode .absolute.inset-0[class*="bg-white"][class*="border"][class*="rounded"] {
+  background: var(--sat-panel) !important;
+  border-color: var(--sat-border) !important;
+  box-shadow: inset 0 1px 0 rgba(0,220,255,0.06), 0 0 20px rgba(0,220,255,0.03) !important;
+}
+
+/* ══ TYPOGRAPHY ══ */
+.satellite-mode .text-primary,
+.satellite-mode .text-primary\/90 {
+  color: var(--sat-accent) !important;
+}
+.satellite-mode [class*="text-white"][class*="/"] {
+  filter: brightness(1.15) saturate(0.3);
+}
+
+/* Gradient text → solid cyan */
+.satellite-mode .bg-clip-text {
+  -webkit-text-fill-color: var(--sat-accent) !important;
+  background: none !important;
+}
+
+/* ══ BORDERS ══ */
+.satellite-mode [class*="border-white"] {
+  border-color: var(--sat-border) !important;
+}
+.satellite-mode [class*="border-primary"] {
+  border-color: var(--sat-accent-dim) !important;
+}
+
+/* ══ GLOWS / AMBIENT → suppressed ══ */
+.satellite-mode [class*="blur-\\[120px\\]"],
+.satellite-mode [class*="blur-\\[100px\\]"] {
+  opacity: 0 !important;
+}
+
+/* ══ BUTTONS ══ */
+.satellite-mode [class*="bg-gradient-to-r"][class*="from-primary"] {
+  background: var(--sat-accent) !important;
+  opacity: 0.9;
+}
+.satellite-mode button[class*="bg-white"] {
+  background: rgba(0,220,255,0.06) !important;
+  border-color: var(--sat-border) !important;
+}
+
+/* ══ NEBULA → hidden ══ */
+.satellite-mode [data-nebula-cloud] {
+  opacity: 0 !important;
+  transition: opacity 0.8s ease;
+}
+
+/* ══ FONTS → monospace feel ══ */
+.satellite-mode .font-display {
+  letter-spacing: 0.08em;
+}
+
+/* ══ Primary color badge/overline ══ */
+.satellite-mode [class*="bg-primary"] {
+  background-color: rgba(0,220,255,0.08) !important;
+  border-color: rgba(0,220,255,0.2) !important;
+}
+
+/* ══ Transition everything smoothly ══ */
+.satellite-mode *,
+.satellite-mode *::before,
+.satellite-mode *::after {
+  transition-property: background-color, border-color, color, opacity, box-shadow, filter;
+  transition-duration: 0.6s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+`;
+
+function SatelliteOverlay() {
+  const { satellite } = useSatelliteMode();
+
+  return (
+    <>
+      {/* Inject override CSS (always present, only targets .satellite-mode) */}
+      <style dangerouslySetInnerHTML={{ __html: overrideCSS }} />
+
+      <AnimatePresence>
+        {satellite &&
+        <>
+            {/* ── Coordinate grid ── */}
+            <motion.div
+            className="fixed inset-0 pointer-events-none z-[2]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: EXPO_OUT }}
+            aria-hidden="true">
+
+              {/* Grid lines */}
+              <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `
+                    linear-gradient(rgba(0,220,255,0.035) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,220,255,0.035) 1px, transparent 1px)
+                  `,
+              backgroundSize: '80px 80px'
+            }} />
+
+              {/* Finer sub-grid */}
+              <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `
+                    linear-gradient(rgba(0,220,255,0.012) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0,220,255,0.012) 1px, transparent 1px)
+                  `,
+              backgroundSize: '20px 20px'
+            }} />
+
+            </motion.div>
+
+            {/* ── Dark vignette ── */}
+            <motion.div
+            className="fixed inset-0 pointer-events-none z-[2]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: EXPO_OUT }}
+            style={{
+              background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.4) 100%)'
+            }} />
+
+
+            {/* ── Scan line ── */}
+            <motion.div
+            className="fixed inset-0 pointer-events-none z-[3] overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: EXPO_OUT }}>
+
+              <motion.div
+              className="absolute left-0 right-0 h-[2px]"
+              style={{
+                background: 'linear-gradient(90deg, transparent 5%, rgba(0,220,255,0.12) 30%, rgba(0,220,255,0.2) 50%, rgba(0,220,255,0.12) 70%, transparent 95%)',
+                boxShadow: '0 0 30px rgba(0,220,255,0.1)'
+              }}
+              animate={{ top: ['-2px', '100vh', '-2px'] }}
+              transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} />
+
+            </motion.div>
+
+            {/* ── CRT faint scanlines ── */}
+            <motion.div
+            className="fixed inset-0 pointer-events-none z-[2]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.015 }}
+            exit={{ opacity: 0 }}
+            style={{
+              backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,220,255,0.08) 3px, rgba(0,220,255,0.08) 4px)'
+            }} />
+
+
+            {/* ── HUD corner markers ── */}
+            <motion.div
+            className="fixed inset-0 pointer-events-none z-[4]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, delay: 0.3, ease: EXPO_OUT }}>
+
+              {/* Top-left */}
+              <div className="absolute top-4 left-4 lg:left-20">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <path d="M2 16 L2 2 L16 2" stroke="rgba(0,220,255,0.4)" strokeWidth="1" />
+                </svg>
+                <div className="mt-1 text-[8px] font-display tracking-[0.2em]" style={{ color: 'rgba(0,220,255,0.3)' }}>
+                  ORBITAL VIEW
+                </div>
+              </div>
+              {/* Top-right */}
+              <div className="absolute top-4 right-4">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="ml-auto">
+                  <path d="M46 16 L46 2 L32 2" stroke="rgba(0,220,255,0.4)" strokeWidth="1" />
+                </svg>
+                <div className="mt-1 text-[8px] font-display tracking-[0.2em] text-right" style={{ color: 'rgba(0,220,255,0.3)' }}>
+                  SAT-7 FEED
+                </div>
+              </div>
+              {/* Bottom-left */}
+              <div className="absolute bottom-4 left-4 lg:left-20">
+                <div className="mb-1 text-[8px] font-display tracking-[0.2em]" style={{ color: 'rgba(0,220,255,0.3)' }}>
+                  4.6°N 137.4°E
+                </div>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <path d="M2 32 L2 46 L16 46" stroke="rgba(0,220,255,0.4)" strokeWidth="1" />
+                </svg>
+              </div>
+              {/* Bottom-right */}
+              <div className="absolute bottom-4 right-4">
+                <div className="mb-1 text-[8px] font-display tracking-[0.2em] text-right" style={{ color: 'rgba(0,220,255,0.3)' }}>
+                  ALT 410km
+                </div>
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="ml-auto">
+                  <path d="M46 32 L46 46 L32 46" stroke="rgba(0,220,255,0.4)" strokeWidth="1" />
+                </svg>
+              </div>
+
+              {/* Center crosshair */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden lg:block">
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                  <circle cx="32" cy="32" r="16" stroke="rgba(0,220,255,0.08)" strokeWidth="0.5" />
+                  <circle cx="32" cy="32" r="4" stroke="rgba(0,220,255,0.15)" strokeWidth="0.5" />
+                  <line x1="32" y1="0" x2="32" y2="24" stroke="rgba(0,220,255,0.06)" strokeWidth="0.5" />
+                  <line x1="32" y1="40" x2="32" y2="64" stroke="rgba(0,220,255,0.06)" strokeWidth="0.5" />
+                  <line x1="0" y1="32" x2="24" y2="32" stroke="rgba(0,220,255,0.06)" strokeWidth="0.5" />
+                  <line x1="40" y1="32" x2="64" y2="32" stroke="rgba(0,220,255,0.06)" strokeWidth="0.5" />
+                </svg>
+              </div>
+
+              {/* Side telemetry strip */}
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 space-y-4 hidden lg:block">
+                {[
+              { label: 'INCLINATION', value: '25.19°' },
+              { label: 'GROUND SPEED', value: '7.66 km/s' },
+              { label: 'RESOLUTION', value: '0.5m/px' },
+              { label: 'BAND', value: 'VNIR+SWIR' },
+              { label: 'LOCAL TIME', value: '14:32 MST' }].
+              map((d) =>
+              <div key={d.label} className="text-right">
+                    <div className="text-[7px] font-display tracking-[0.15em]" style={{ color: 'rgba(0,220,255,0.2)' }}>
+                      {d.label}
+                    </div>
+                    <div className="text-[10px] font-display font-bold" style={{ color: 'rgba(0,220,255,0.5)' }}>
+                      {d.value}
+                    </div>
+                  </div>
+              )}
+              </div>
+            </motion.div>
+          </>
+        }
+      </AnimatePresence>
+    </>);
+
+}
+
+export default memo(SatelliteOverlay);

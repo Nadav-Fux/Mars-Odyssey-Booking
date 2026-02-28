@@ -1,1 +1,61 @@
-{"path":"src/components/AchievementToast.tsx","content":"import { useEffect } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { Trophy } from 'lucide-react';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useAchievements } from '@/hooks/useAchievements';\nimport { useMissionLog } from '@/hooks/useMissionLog';\n\n/* ================================================================\n   ACHIEVEMENT TOAST\n\n   Shows a cinematic notification when a new achievement is unlocked.\n   Auto-dismisses after 4 seconds.\n   ================================================================ */\n\nexport default function AchievementToast() {\n  const { lastUnlocked, clearLastUnlocked } = useAchievements();\n  const { logAchievement } = useMissionLog();\n\n  useEffect(() => {\n    if (!lastUnlocked) return;\n    logAchievement(lastUnlocked.title, lastUnlocked.icon);\n    const t = setTimeout(clearLastUnlocked, 4000);\n    return () => clearTimeout(t);\n  }, [lastUnlocked, clearLastUnlocked, logAchievement]);\n\n  return (\n    <AnimatePresence>\n      {lastUnlocked &&\n      <motion.div\n        initial={{ y: -80, opacity: 0, scale: 0.9 }}\n        animate={{ y: 0, opacity: 1, scale: 1 }}\n        exit={{ y: -60, opacity: 0, scale: 0.95 }}\n        transition={{ duration: 0.5, ease: EXPO_OUT }}\n        className=\"fixed top-10 left-1/2 -translate-x-1/2 z-[9000] pointer-events-none\">\n\n          <div className=\"flex items-center gap-3 px-5 py-3 rounded-2xl bg-black/80 backdrop-blur-xl border border-amber-500/20 shadow-2xl\">\n            {/* Glow */}\n            <div className=\"absolute inset-0 rounded-2xl\" style={{ boxShadow: '0 0 30px rgba(245,158,11,0.1), inset 0 0 30px rgba(245,158,11,0.03)' }} />\n            {/* Top accent */}\n            <div className=\"absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl bg-gradient-to-r from-transparent via-amber-500/60 to-transparent\" />\n\n            {/* Icon */}\n            <div className=\"w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-lg shrink-0\">\n              {lastUnlocked.icon}\n            </div>\n\n            {/* Text */}\n            <div>\n              <div className=\"flex items-center gap-2\">\n                <Trophy className=\"w-3 h-3 text-amber-400/70\" />\n                <span className=\"text-[8px] font-display tracking-[0.25em] text-amber-400/70 font-bold\">ACHIEVEMENT UNLOCKED</span>\n              </div>\n              <div className=\"text-sm text-white/70 font-medium mt-0.5\">{lastUnlocked.title}</div>\n              <div className=\"text-[10px] text-white/50 mt-0.5\">{lastUnlocked.description}</div>\n            </div>\n          </div>\n        </motion.div>\n      }\n    </AnimatePresence>);\n\n}","encoding":"utf8"}
+import { useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy } from 'lucide-react';
+import { EXPO_OUT } from '@/lib/easing';
+import { useAchievements } from '@/hooks/useAchievements';
+import { useMissionLog } from '@/hooks/useMissionLog';
+
+/* ================================================================
+   ACHIEVEMENT TOAST
+
+   Shows a cinematic notification when a new achievement is unlocked.
+   Auto-dismisses after 4 seconds.
+   ================================================================ */
+
+export default function AchievementToast() {
+  const { lastUnlocked, clearLastUnlocked } = useAchievements();
+  const { logAchievement } = useMissionLog();
+
+  useEffect(() => {
+    if (!lastUnlocked) return;
+    logAchievement(lastUnlocked.title, lastUnlocked.icon);
+    const t = setTimeout(clearLastUnlocked, 4000);
+    return () => clearTimeout(t);
+  }, [lastUnlocked, clearLastUnlocked, logAchievement]);
+
+  return (
+    <AnimatePresence>
+      {lastUnlocked &&
+      <motion.div
+        initial={{ y: -80, opacity: 0, scale: 0.9 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: -60, opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.5, ease: EXPO_OUT }}
+        className="fixed top-10 left-1/2 -translate-x-1/2 z-[9000] pointer-events-none">
+
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-black/80 backdrop-blur-xl border border-amber-500/20 shadow-2xl">
+            {/* Glow */}
+            <div className="absolute inset-0 rounded-2xl" style={{ boxShadow: '0 0 30px rgba(245,158,11,0.1), inset 0 0 30px rgba(245,158,11,0.03)' }} />
+            {/* Top accent */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
+
+            {/* Icon */}
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-lg shrink-0">
+              {lastUnlocked.icon}
+            </div>
+
+            {/* Text */}
+            <div>
+              <div className="flex items-center gap-2">
+                <Trophy className="w-3 h-3 text-amber-400/70" />
+                <span className="text-[8px] font-display tracking-[0.25em] text-amber-400/70 font-bold">ACHIEVEMENT UNLOCKED</span>
+              </div>
+              <div className="text-sm text-white/70 font-medium mt-0.5">{lastUnlocked.title}</div>
+              <div className="text-[10px] text-white/50 mt-0.5">{lastUnlocked.description}</div>
+            </div>
+          </div>
+        </motion.div>
+      }
+    </AnimatePresence>);
+
+}

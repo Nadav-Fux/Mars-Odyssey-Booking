@@ -1,1 +1,16 @@
-{"path":"src/components/ScrollToTop.tsx","content":"import { useEffect } from 'react';\nimport { useLocation } from 'react-router';\n\n/**\n * Scrolls to top whenever the route changes.\n * Place once inside <BrowserRouter>.\n */\nexport default function ScrollToTop() {\n  const { pathname } = useLocation();\n\n  useEffect(() => {\n    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });\n  }, [pathname]);\n\n  return null;\n}\n","encoding":"utf8"}
+import { useEffect } from 'react';
+import { useLocation } from 'react-router';
+
+/**
+ * Scrolls to top whenever the route changes.
+ * Place once inside <BrowserRouter>.
+ */
+export default function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
+
+  return null;
+}

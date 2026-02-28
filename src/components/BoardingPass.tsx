@@ -1,1 +1,410 @@
-{"path":"src/components/BoardingPass.tsx","content":"import { useState, useEffect, useRef, memo, useCallback } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { X, Shield, Star, Fingerprint, Zap, Globe, ChevronRight } from 'lucide-react';\nimport { useAchievements, ACHIEVEMENTS } from '@/hooks/useAchievements';\nimport { EXPO_OUT } from '@/lib/easing';\n\n/* ================================================================\n   COMMANDER'S BOARDING PASS\n   \n   A cinematic, interactive boarding card that summarises the user's\n   journey through the ARES-X site: achievements, high-score,\n   pages visited, time on mission.  Designed to look like a real\n   spacecraft boarding pass / security credential.\n   ================================================================ */\n\ninterface Props {\n  open: boolean;\n  onClose: () => void;\n}\n\n// ── Helpers ──\nconst CALLSIGNS = [\n'PHOENIX', 'HORIZON', 'VANGUARD', 'ECLIPSE', 'NOVA', 'ZENITH',\n'AURORA', 'TITAN', 'STELLAR', 'NEBULA', 'QUASAR', 'PULSAR',\n'COMET', 'ORBIT', 'COSMO', 'ASTRAL', 'LUNAR', 'SOLARIS'];\n\n\nfunction getCallsign(): string {\n  let cs = localStorage.getItem('ares_callsign');\n  if (!cs) {\n    const name = CALLSIGNS[Math.floor(Math.random() * CALLSIGNS.length)];\n    const num = String(Math.floor(100 + Math.random() * 900));\n    cs = `${name}-${num}`;\n    localStorage.setItem('ares_callsign', cs);\n  }\n  return cs;\n}\n\nfunction getFirstVisitDate(): string {\n  let d = localStorage.getItem('ares_first_visit');\n  if (!d) {\n    d = new Date().toISOString();\n    localStorage.setItem('ares_first_visit', d);\n  }\n  return d;\n}\n\nfunction getClearanceLevel(total: number): {label: string;color: string;} {\n  if (total >= 9) return { label: 'ALPHA-1', color: '#fbbf24' };\n  if (total >= 7) return { label: 'ALPHA', color: '#f97316' };\n  if (total >= 5) return { label: 'BETA', color: '#3b82f6' };\n  if (total >= 3) return { label: 'GAMMA', color: '#22c55e' };\n  return { label: 'DELTA', color: '#94a3b8' };\n}\n\nfunction formatMET(): string {\n  const first = getFirstVisitDate();\n  const ms = Date.now() - new Date(first).getTime();\n  const days = Math.floor(ms / 86400000);\n  const hours = Math.floor(ms % 86400000 / 3600000);\n  const mins = Math.floor(ms % 3600000 / 60000);\n  if (days > 0) return `${days}d ${hours}h ${mins}m`;\n  if (hours > 0) return `${hours}h ${mins}m`;\n  return `${mins}m`;\n}\n\n// Decorative barcode\nfunction Barcode() {\n  const bars = useRef(\n    Array.from({ length: 40 }, () => ({\n      w: Math.random() > 0.5 ? 2 : 1,\n      h: 28 + Math.random() * 12,\n      opacity: 0.3 + Math.random() * 0.5\n    }))\n  );\n  return (\n    <div className=\"flex items-end gap-[1px] h-10\">\n      {bars.current.map((b, i) =>\n      <div\n      key={i}\n      className=\"bg-white rounded-[0.5px]\"\n      style={{ width: b.w, height: b.h, opacity: b.opacity }} />\n\n      )}\n    </div>);\n\n}\n\n// Perforated edge\nfunction PerfEdge({ side }: {side: 'left' | 'right';}) {\n  return (\n    <div className={`absolute top-0 ${side}-0 h-full flex flex-col justify-between py-4`}>\n      {Array.from({ length: 18 }, (_, i) =>\n      <div\n      key={i}\n      className=\"w-2 h-2 rounded-full bg-black/80\"\n      style={{ marginLeft: side === 'left' ? -4 : 0, marginRight: side === 'right' ? -4 : 0 }} />\n\n      )}\n    </div>);\n\n}\n\nfunction BoardingPass({ open, onClose }: Props) {\n  const { unlocked, totalUnlocked, totalAchievements } = useAchievements();\n  const [callsign] = useState(getCallsign);\n  const [commanderName, setCommanderName] = useState(\n    () => localStorage.getItem('ares_commander_name') || ''\n  );\n  const [editingName, setEditingName] = useState(false);\n  const nameInputRef = useRef<HTMLInputElement>(null);\n\n  const highScore = Number(localStorage.getItem('ares_asteroid_hs') || '0');\n  const clearance = getClearanceLevel(totalUnlocked);\n  const pagesVisited = (() => {\n    try {\n      const v = JSON.parse(localStorage.getItem('ares-visited-pages') || '[]');\n      return Array.isArray(v) ? v.length : 0;\n    } catch {return 0;}\n  })();\n\n  // MET updates\n  const [met, setMet] = useState(formatMET);\n  useEffect(() => {\n    if (!open) return;\n    const id = setInterval(() => setMet(formatMET()), 10000);\n    return () => clearInterval(id);\n  }, [open]);\n\n  // Save name\n  const saveName = useCallback(() => {\n    const trimmed = commanderName.trim().toUpperCase();\n    setCommanderName(trimmed);\n    if (trimmed) localStorage.setItem('ares_commander_name', trimmed);\n    setEditingName(false);\n  }, [commanderName]);\n\n  useEffect(() => {\n    if (editingName) setTimeout(() => nameInputRef.current?.focus(), 50);\n  }, [editingName]);\n\n  // Board date\n  const boardDate = new Date(getFirstVisitDate());\n  const dateStr = boardDate.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();\n\n  return (\n    <AnimatePresence>\n      {open &&\n      <motion.div\n        className=\"fixed inset-0 z-[210] flex items-center justify-center p-4\"\n        initial={{ opacity: 0 }}\n        animate={{ opacity: 1 }}\n        exit={{ opacity: 0 }}\n        transition={{ duration: 0.25, ease: EXPO_OUT }}>\n\n          {/* Backdrop */}\n          <div\n        className=\"absolute inset-0\"\n        style={{ background: 'rgba(2,2,8,0.88)', backdropFilter: 'blur(8px)' }}\n        onClick={onClose} />\n\n\n          {/* Card */}\n          <motion.div\n          className=\"relative w-full max-w-md\"\n          initial={{ y: 60, scale: 0.92, rotateX: 8 }}\n          animate={{ y: 0, scale: 1, rotateX: 0 }}\n          exit={{ y: 40, scale: 0.95, opacity: 0 }}\n          transition={{ type: 'spring', stiffness: 300, damping: 28 }}\n          style={{ perspective: '800px' }}>\n\n            {/* Close button */}\n            <button\n          onClick={onClose}\n          className=\"absolute -top-3 -right-3 z-20 w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer\">\n\n              <X className=\"w-4 h-4 text-white/70\" />\n            </button>\n\n            {/* ── CARD BODY ── */}\n            <div\n          className=\"relative overflow-hidden rounded-2xl\"\n          style={{\n            background: 'linear-gradient(135deg, #0c0c1e 0%, #111127 40%, #0a0a1a 100%)',\n            border: '1px solid rgba(255,255,255,0.08)',\n            boxShadow: '0 0 80px rgba(255,69,0,0.08), 0 25px 50px rgba(0,0,0,0.5)'\n          }}>\n\n              <PerfEdge side=\"left\" />\n              <PerfEdge side=\"right\" />\n\n              {/* Subtle grid pattern */}\n              <div\n            className=\"absolute inset-0 pointer-events-none opacity-[0.03]\"\n            style={{\n              backgroundImage:\n              'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',\n              backgroundSize: '24px 24px'\n            }} />\n\n\n              {/* ── Header ── */}\n              <div className=\"relative px-6 pt-5 pb-4 border-b border-white/[0.06]\">\n                <div className=\"flex items-start justify-between\">\n                  <div>\n                    <div className=\"text-[8px] font-display tracking-[0.25em] text-white/50 mb-1\">\n                      INTERPLANETARY TRANSIT AUTHORITY\n                    </div>\n                    <div className=\"text-lg font-display tracking-[0.12em] text-white/90 font-bold\">\n                      BOARDING PASS\n                    </div>\n                  </div>\n                  <div className=\"text-right\">\n                    <div className=\"text-[8px] font-display tracking-[0.15em] text-white/50\">FLIGHT</div>\n                    <div className=\"text-base font-display tracking-[0.1em] text-primary/80 font-bold\">ARES-7</div>\n                  </div>\n                </div>\n\n                {/* Route */}\n                <div className=\"flex items-center gap-3 mt-4\">\n                  <div className=\"text-center\">\n                    <div className=\"text-2xl font-display font-bold text-white/90\">ERT</div>\n                    <div className=\"text-[8px] font-display tracking-[0.12em] text-white/50\">EARTH</div>\n                  </div>\n                  <div className=\"flex-1 flex items-center gap-1.5\">\n                    <div className=\"h-[1px] flex-1 bg-gradient-to-r from-white/20 to-transparent\" />\n                    <div className=\"relative\">\n                      <ChevronRight className=\"w-3.5 h-3.5 text-primary/50\" />\n                    </div>\n                    <div className=\"text-[7px] font-display tracking-[0.15em] text-white/50\">225M KM</div>\n                    <div className=\"relative\">\n                      <ChevronRight className=\"w-3.5 h-3.5 text-primary/50\" />\n                    </div>\n                    <div className=\"h-[1px] flex-1 bg-gradient-to-l from-white/20 to-transparent\" />\n                  </div>\n                  <div className=\"text-center\">\n                    <div className=\"text-2xl font-display font-bold text-primary/90\">MRS</div>\n                    <div className=\"text-[8px] font-display tracking-[0.12em] text-white/50\">MARS</div>\n                  </div>\n                </div>\n              </div>\n\n              {/* ── Commander Details ── */}\n              <div className=\"relative px-6 py-4 border-b border-dashed border-white/[0.06]\">\n                <div className=\"grid grid-cols-2 gap-x-4 gap-y-3\">\n                  {/* Name */}\n                  <div className=\"col-span-2\">\n                    <div className=\"text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5 flex items-center gap-1.5\">\n                      <Fingerprint className=\"w-2.5 h-2.5\" />\n                      COMMANDER\n                    </div>\n                    {editingName ?\n                  <form\n                  onSubmit={(e) => {e.preventDefault();saveName();}}\n                  className=\"flex gap-2\">\n\n                        <input\n                    ref={nameInputRef}\n                    value={commanderName}\n                    onChange={(e) => setCommanderName(e.target.value.slice(0, 24))}\n                    className=\"flex-1 bg-white/[0.04] border border-white/10 rounded px-2 py-0.5 text-sm font-display tracking-[0.1em] text-white/90 uppercase outline-none focus:border-primary/40\"\n                    placeholder=\"ENTER YOUR NAME\"\n                    maxLength={24}\n                    spellCheck={false} />\n\n                        <button\n                    type=\"submit\"\n                    className=\"text-[9px] font-display tracking-[0.12em] text-primary/70 hover:text-primary transition-colors px-2 cursor-pointer\">\n\n                          SAVE\n                        </button>\n                      </form> :\n\n                  <button\n                  onClick={() => setEditingName(true)}\n                  className=\"text-sm font-display tracking-[0.1em] text-white/80 hover:text-white transition-colors cursor-pointer text-left\">\n\n                        {commanderName ||\n                    <span className=\"text-white/50 animate-pulse\">TAP TO SET NAME</span>\n                    }\n                      </button>\n                  }\n                  </div>\n\n                  {/* Callsign */}\n                  <div>\n                    <div className=\"text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5\">CALLSIGN</div>\n                    <div className=\"text-[11px] font-mono text-primary/70 font-semibold\">{callsign}</div>\n                  </div>\n\n                  {/* Clearance */}\n                  <div>\n                    <div className=\"text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5 flex items-center gap-1\">\n                      <Shield className=\"w-2.5 h-2.5\" />\n                      CLEARANCE\n                    </div>\n                    <div\n                  className=\"text-[11px] font-display tracking-[0.12em] font-bold\"\n                  style={{ color: clearance.color }}>\n\n                      {clearance.label}\n                    </div>\n                  </div>\n\n                  {/* Board date */}\n                  <div>\n                    <div className=\"text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5\">BOARD DATE</div>\n                    <div className=\"text-[11px] font-mono text-white/60\">{dateStr}</div>\n                  </div>\n\n                  {/* MET */}\n                  <div>\n                    <div className=\"text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5 flex items-center gap-1\">\n                      <Zap className=\"w-2.5 h-2.5\" />\n                      MISSION TIME\n                    </div>\n                    <div className=\"text-[11px] font-mono text-white/60\">{met}</div>\n                  </div>\n                </div>\n              </div>\n\n              {/* ── Stats Row ── */}\n              <div className=\"relative px-6 py-3 border-b border-white/[0.06] flex items-center justify-between\">\n                <div className=\"text-center\">\n                  <div className=\"text-[8px] font-display tracking-[0.15em] text-white/50\">PAGES</div>\n                  <div className=\"text-lg font-display font-bold text-white/80\">{pagesVisited}<span className=\"text-white/50 text-sm\">/6</span></div>\n                </div>\n                <div className=\"w-px h-8 bg-white/[0.06]\" />\n                <div className=\"text-center\">\n                  <div className=\"text-[8px] font-display tracking-[0.15em] text-white/50 flex items-center justify-center gap-1\">\n                    <Star className=\"w-2.5 h-2.5\" />\n                    ACHIEVEMENTS\n                  </div>\n                  <div className=\"text-lg font-display font-bold text-primary/80\">{totalUnlocked}<span className=\"text-white/50 text-sm\">/{totalAchievements}</span></div>\n                </div>\n                <div className=\"w-px h-8 bg-white/[0.06]\" />\n                <div className=\"text-center\">\n                  <div className=\"text-[8px] font-display tracking-[0.15em] text-white/50 flex items-center justify-center gap-1\">\n                    <Globe className=\"w-2.5 h-2.5\" />\n                    HI-SCORE\n                  </div>\n                  <div className=\"text-lg font-display font-bold text-yellow-400/80\">{highScore}</div>\n                </div>\n              </div>\n\n              {/* ── Achievement Badges ── */}\n              <div className=\"relative px-6 py-3 border-b border-white/[0.06]\">\n                <div className=\"text-[8px] font-display tracking-[0.2em] text-white/50 mb-2\">EARNED CREDENTIALS</div>\n                <div className=\"flex flex-wrap gap-2\">\n                  {ACHIEVEMENTS.map((a) => {\n                  const earned = unlocked.has(a.id);\n                  return (\n                    <div\n                    key={a.id}\n                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-display tracking-[0.1em] border transition-all ${\n                    earned ?\n                    'bg-primary/10 border-primary/20 text-primary/80' :\n                    'bg-white/[0.02] border-white/[0.04] text-white/50'}`\n                    }\n                    title={earned ? `${a.title}: ${a.description}` : a.secret ? '???' : a.description}>\n\n                        <span className=\"text-xs\">{earned ? a.icon : a.secret ? '🔒' : '○'}</span>\n                        <span>{earned ? a.title.toUpperCase() : a.secret ? '???' : a.title.toUpperCase()}</span>\n                      </div>);\n\n                })}\n                </div>\n              </div>\n\n              {/* ── Footer / Barcode ── */}\n              <div className=\"relative px-6 py-4 flex items-end justify-between\">\n                <div>\n                  <Barcode />\n                  <div className=\"text-[7px] font-mono text-white/50 mt-1 tracking-[0.12em]\">\n                    ITA-{callsign}-{dateStr.replace(/\\s/g, '')}\n                  </div>\n                </div>\n                <div className=\"text-right\">\n                  <div className=\"text-[8px] font-display tracking-[0.15em] text-white/50\">CABIN</div>\n                  <div className=\"text-sm font-display tracking-[0.1em] text-white/60 font-bold\">\n                    {totalUnlocked >= 8 ? 'PIONEER SUITE' : totalUnlocked >= 5 ? 'EXPLORER POD' : 'STANDARD'}\n                  </div>\n                  <div className=\"text-[7px] font-display tracking-[0.1em] text-white/50 mt-0.5\">\n                    SEAT {String.fromCharCode(65 + callsign.charCodeAt(0) % 6)}-{String(callsign.charCodeAt(callsign.length - 1) % 40 + 1).padStart(2, '0')}\n                  </div>\n                </div>\n              </div>\n\n              {/* Corner accent */}\n              <div\n            className=\"absolute top-0 right-0 w-20 h-20 pointer-events-none\"\n            style={{\n              background: 'radial-gradient(circle at 100% 0%, rgba(255,69,0,0.08) 0%, transparent 70%)'\n            }} />\n\n              <div\n            className=\"absolute bottom-0 left-0 w-20 h-20 pointer-events-none\"\n            style={{\n              background: 'radial-gradient(circle at 0% 100%, rgba(255,69,0,0.05) 0%, transparent 70%)'\n            }} />\n\n            </div>\n          </motion.div>\n        </motion.div>\n      }\n    </AnimatePresence>);\n\n}\n\nexport default memo(BoardingPass);","encoding":"utf8"}
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Shield, Star, Fingerprint, Zap, Globe, ChevronRight } from 'lucide-react';
+import { useAchievements, ACHIEVEMENTS } from '@/hooks/useAchievements';
+import { EXPO_OUT } from '@/lib/easing';
+
+/* ================================================================
+   COMMANDER'S BOARDING PASS
+   
+   A cinematic, interactive boarding card that summarises the user's
+   journey through the ARES-X site: achievements, high-score,
+   pages visited, time on mission.  Designed to look like a real
+   spacecraft boarding pass / security credential.
+   ================================================================ */
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+}
+
+// ── Helpers ──
+const CALLSIGNS = [
+'PHOENIX', 'HORIZON', 'VANGUARD', 'ECLIPSE', 'NOVA', 'ZENITH',
+'AURORA', 'TITAN', 'STELLAR', 'NEBULA', 'QUASAR', 'PULSAR',
+'COMET', 'ORBIT', 'COSMO', 'ASTRAL', 'LUNAR', 'SOLARIS'];
+
+
+function getCallsign(): string {
+  let cs = localStorage.getItem('ares_callsign');
+  if (!cs) {
+    const name = CALLSIGNS[Math.floor(Math.random() * CALLSIGNS.length)];
+    const num = String(Math.floor(100 + Math.random() * 900));
+    cs = `${name}-${num}`;
+    localStorage.setItem('ares_callsign', cs);
+  }
+  return cs;
+}
+
+function getFirstVisitDate(): string {
+  let d = localStorage.getItem('ares_first_visit');
+  if (!d) {
+    d = new Date().toISOString();
+    localStorage.setItem('ares_first_visit', d);
+  }
+  return d;
+}
+
+function getClearanceLevel(total: number): {label: string;color: string;} {
+  if (total >= 9) return { label: 'ALPHA-1', color: '#fbbf24' };
+  if (total >= 7) return { label: 'ALPHA', color: '#f97316' };
+  if (total >= 5) return { label: 'BETA', color: '#3b82f6' };
+  if (total >= 3) return { label: 'GAMMA', color: '#22c55e' };
+  return { label: 'DELTA', color: '#94a3b8' };
+}
+
+function formatMET(): string {
+  const first = getFirstVisitDate();
+  const ms = Date.now() - new Date(first).getTime();
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor(ms % 86400000 / 3600000);
+  const mins = Math.floor(ms % 3600000 / 60000);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+// Decorative barcode
+function Barcode() {
+  const bars = useRef(
+    Array.from({ length: 40 }, () => ({
+      w: Math.random() > 0.5 ? 2 : 1,
+      h: 28 + Math.random() * 12,
+      opacity: 0.3 + Math.random() * 0.5
+    }))
+  );
+  return (
+    <div className="flex items-end gap-[1px] h-10">
+      {bars.current.map((b, i) =>
+      <div
+      key={i}
+      className="bg-white rounded-[0.5px]"
+      style={{ width: b.w, height: b.h, opacity: b.opacity }} />
+
+      )}
+    </div>);
+
+}
+
+// Perforated edge
+function PerfEdge({ side }: {side: 'left' | 'right';}) {
+  return (
+    <div className={`absolute top-0 ${side}-0 h-full flex flex-col justify-between py-4`}>
+      {Array.from({ length: 18 }, (_, i) =>
+      <div
+      key={i}
+      className="w-2 h-2 rounded-full bg-black/80"
+      style={{ marginLeft: side === 'left' ? -4 : 0, marginRight: side === 'right' ? -4 : 0 }} />
+
+      )}
+    </div>);
+
+}
+
+function BoardingPass({ open, onClose }: Props) {
+  const { unlocked, totalUnlocked, totalAchievements } = useAchievements();
+  const [callsign] = useState(getCallsign);
+  const [commanderName, setCommanderName] = useState(
+    () => localStorage.getItem('ares_commander_name') || ''
+  );
+  const [editingName, setEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const highScore = Number(localStorage.getItem('ares_asteroid_hs') || '0');
+  const clearance = getClearanceLevel(totalUnlocked);
+  const pagesVisited = (() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('ares-visited-pages') || '[]');
+      return Array.isArray(v) ? v.length : 0;
+    } catch {return 0;}
+  })();
+
+  // MET updates
+  const [met, setMet] = useState(formatMET);
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setMet(formatMET()), 10000);
+    return () => clearInterval(id);
+  }, [open]);
+
+  // Save name
+  const saveName = useCallback(() => {
+    const trimmed = commanderName.trim().toUpperCase();
+    setCommanderName(trimmed);
+    if (trimmed) localStorage.setItem('ares_commander_name', trimmed);
+    setEditingName(false);
+  }, [commanderName]);
+
+  useEffect(() => {
+    if (editingName) setTimeout(() => nameInputRef.current?.focus(), 50);
+  }, [editingName]);
+
+  // Board date
+  const boardDate = new Date(getFirstVisitDate());
+  const dateStr = boardDate.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+
+  return (
+    <AnimatePresence>
+      {open &&
+      <motion.div
+        className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25, ease: EXPO_OUT }}>
+
+          {/* Backdrop */}
+          <div
+        className="absolute inset-0"
+        style={{ background: 'rgba(2,2,8,0.88)', backdropFilter: 'blur(8px)' }}
+        onClick={onClose} />
+
+
+          {/* Card */}
+          <motion.div
+          className="relative w-full max-w-md"
+          initial={{ y: 60, scale: 0.92, rotateX: 8 }}
+          animate={{ y: 0, scale: 1, rotateX: 0 }}
+          exit={{ y: 40, scale: 0.95, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+          style={{ perspective: '800px' }}>
+
+            {/* Close button */}
+            <button
+          onClick={onClose}
+          className="absolute -top-3 -right-3 z-20 w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer">
+
+              <X className="w-4 h-4 text-white/70" />
+            </button>
+
+            {/* ── CARD BODY ── */}
+            <div
+          className="relative overflow-hidden rounded-2xl"
+          style={{
+            background: 'linear-gradient(135deg, #0c0c1e 0%, #111127 40%, #0a0a1a 100%)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 0 80px rgba(255,69,0,0.08), 0 25px 50px rgba(0,0,0,0.5)'
+          }}>
+
+              <PerfEdge side="left" />
+              <PerfEdge side="right" />
+
+              {/* Subtle grid pattern */}
+              <div
+            className="absolute inset-0 pointer-events-none opacity-[0.03]"
+            style={{
+              backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+              backgroundSize: '24px 24px'
+            }} />
+
+
+              {/* ── Header ── */}
+              <div className="relative px-6 pt-5 pb-4 border-b border-white/[0.06]">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-[8px] font-display tracking-[0.25em] text-white/50 mb-1">
+                      INTERPLANETARY TRANSIT AUTHORITY
+                    </div>
+                    <div className="text-lg font-display tracking-[0.12em] text-white/90 font-bold">
+                      BOARDING PASS
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[8px] font-display tracking-[0.15em] text-white/50">FLIGHT</div>
+                    <div className="text-base font-display tracking-[0.1em] text-primary/80 font-bold">ARES-7</div>
+                  </div>
+                </div>
+
+                {/* Route */}
+                <div className="flex items-center gap-3 mt-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-display font-bold text-white/90">ERT</div>
+                    <div className="text-[8px] font-display tracking-[0.12em] text-white/50">EARTH</div>
+                  </div>
+                  <div className="flex-1 flex items-center gap-1.5">
+                    <div className="h-[1px] flex-1 bg-gradient-to-r from-white/20 to-transparent" />
+                    <div className="relative">
+                      <ChevronRight className="w-3.5 h-3.5 text-primary/50" />
+                    </div>
+                    <div className="text-[7px] font-display tracking-[0.15em] text-white/50">225M KM</div>
+                    <div className="relative">
+                      <ChevronRight className="w-3.5 h-3.5 text-primary/50" />
+                    </div>
+                    <div className="h-[1px] flex-1 bg-gradient-to-l from-white/20 to-transparent" />
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-display font-bold text-primary/90">MRS</div>
+                    <div className="text-[8px] font-display tracking-[0.12em] text-white/50">MARS</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Commander Details ── */}
+              <div className="relative px-6 py-4 border-b border-dashed border-white/[0.06]">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {/* Name */}
+                  <div className="col-span-2">
+                    <div className="text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5 flex items-center gap-1.5">
+                      <Fingerprint className="w-2.5 h-2.5" />
+                      COMMANDER
+                    </div>
+                    {editingName ?
+                  <form
+                  onSubmit={(e) => {e.preventDefault();saveName();}}
+                  className="flex gap-2">
+
+                        <input
+                    ref={nameInputRef}
+                    value={commanderName}
+                    onChange={(e) => setCommanderName(e.target.value.slice(0, 24))}
+                    className="flex-1 bg-white/[0.04] border border-white/10 rounded px-2 py-0.5 text-sm font-display tracking-[0.1em] text-white/90 uppercase outline-none focus:border-primary/40"
+                    placeholder="ENTER YOUR NAME"
+                    maxLength={24}
+                    spellCheck={false} />
+
+                        <button
+                    type="submit"
+                    className="text-[9px] font-display tracking-[0.12em] text-primary/70 hover:text-primary transition-colors px-2 cursor-pointer">
+
+                          SAVE
+                        </button>
+                      </form> :
+
+                  <button
+                  onClick={() => setEditingName(true)}
+                  className="text-sm font-display tracking-[0.1em] text-white/80 hover:text-white transition-colors cursor-pointer text-left">
+
+                        {commanderName ||
+                    <span className="text-white/50 animate-pulse">TAP TO SET NAME</span>
+                    }
+                      </button>
+                  }
+                  </div>
+
+                  {/* Callsign */}
+                  <div>
+                    <div className="text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5">CALLSIGN</div>
+                    <div className="text-[11px] font-mono text-primary/70 font-semibold">{callsign}</div>
+                  </div>
+
+                  {/* Clearance */}
+                  <div>
+                    <div className="text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5 flex items-center gap-1">
+                      <Shield className="w-2.5 h-2.5" />
+                      CLEARANCE
+                    </div>
+                    <div
+                  className="text-[11px] font-display tracking-[0.12em] font-bold"
+                  style={{ color: clearance.color }}>
+
+                      {clearance.label}
+                    </div>
+                  </div>
+
+                  {/* Board date */}
+                  <div>
+                    <div className="text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5">BOARD DATE</div>
+                    <div className="text-[11px] font-mono text-white/60">{dateStr}</div>
+                  </div>
+
+                  {/* MET */}
+                  <div>
+                    <div className="text-[8px] font-display tracking-[0.2em] text-white/50 mb-0.5 flex items-center gap-1">
+                      <Zap className="w-2.5 h-2.5" />
+                      MISSION TIME
+                    </div>
+                    <div className="text-[11px] font-mono text-white/60">{met}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Stats Row ── */}
+              <div className="relative px-6 py-3 border-b border-white/[0.06] flex items-center justify-between">
+                <div className="text-center">
+                  <div className="text-[8px] font-display tracking-[0.15em] text-white/50">PAGES</div>
+                  <div className="text-lg font-display font-bold text-white/80">{pagesVisited}<span className="text-white/50 text-sm">/6</span></div>
+                </div>
+                <div className="w-px h-8 bg-white/[0.06]" />
+                <div className="text-center">
+                  <div className="text-[8px] font-display tracking-[0.15em] text-white/50 flex items-center justify-center gap-1">
+                    <Star className="w-2.5 h-2.5" />
+                    ACHIEVEMENTS
+                  </div>
+                  <div className="text-lg font-display font-bold text-primary/80">{totalUnlocked}<span className="text-white/50 text-sm">/{totalAchievements}</span></div>
+                </div>
+                <div className="w-px h-8 bg-white/[0.06]" />
+                <div className="text-center">
+                  <div className="text-[8px] font-display tracking-[0.15em] text-white/50 flex items-center justify-center gap-1">
+                    <Globe className="w-2.5 h-2.5" />
+                    HI-SCORE
+                  </div>
+                  <div className="text-lg font-display font-bold text-yellow-400/80">{highScore}</div>
+                </div>
+              </div>
+
+              {/* ── Achievement Badges ── */}
+              <div className="relative px-6 py-3 border-b border-white/[0.06]">
+                <div className="text-[8px] font-display tracking-[0.2em] text-white/50 mb-2">EARNED CREDENTIALS</div>
+                <div className="flex flex-wrap gap-2">
+                  {ACHIEVEMENTS.map((a) => {
+                  const earned = unlocked.has(a.id);
+                  return (
+                    <div
+                    key={a.id}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-display tracking-[0.1em] border transition-all ${
+                    earned ?
+                    'bg-primary/10 border-primary/20 text-primary/80' :
+                    'bg-white/[0.02] border-white/[0.04] text-white/50'}`
+                    }
+                    title={earned ? `${a.title}: ${a.description}` : a.secret ? '???' : a.description}>
+
+                        <span className="text-xs">{earned ? a.icon : a.secret ? '🔒' : '○'}</span>
+                        <span>{earned ? a.title.toUpperCase() : a.secret ? '???' : a.title.toUpperCase()}</span>
+                      </div>);
+
+                })}
+                </div>
+              </div>
+
+              {/* ── Footer / Barcode ── */}
+              <div className="relative px-6 py-4 flex items-end justify-between">
+                <div>
+                  <Barcode />
+                  <div className="text-[7px] font-mono text-white/50 mt-1 tracking-[0.12em]">
+                    ITA-{callsign}-{dateStr.replace(/\s/g, '')}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[8px] font-display tracking-[0.15em] text-white/50">CABIN</div>
+                  <div className="text-sm font-display tracking-[0.1em] text-white/60 font-bold">
+                    {totalUnlocked >= 8 ? 'PIONEER SUITE' : totalUnlocked >= 5 ? 'EXPLORER POD' : 'STANDARD'}
+                  </div>
+                  <div className="text-[7px] font-display tracking-[0.1em] text-white/50 mt-0.5">
+                    SEAT {String.fromCharCode(65 + callsign.charCodeAt(0) % 6)}-{String(callsign.charCodeAt(callsign.length - 1) % 40 + 1).padStart(2, '0')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Corner accent */}
+              <div
+            className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle at 100% 0%, rgba(255,69,0,0.08) 0%, transparent 70%)'
+            }} />
+
+              <div
+            className="absolute bottom-0 left-0 w-20 h-20 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle at 0% 100%, rgba(255,69,0,0.05) 0%, transparent 70%)'
+            }} />
+
+            </div>
+          </motion.div>
+        </motion.div>
+      }
+    </AnimatePresence>);
+
+}
+
+export default memo(BoardingPass);

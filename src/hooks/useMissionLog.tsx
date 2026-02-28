@@ -1,1 +1,159 @@
-{"path":"src/hooks/useMissionLog.tsx","content":"import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';\n\n/* ================================================================\n   MISSION LOG  —  Captain's Journal\n\n   Automatically records timestamped log entries as the user\n   explores the site.  Entries persist in localStorage.\n\n   Call `log(icon, text)` from anywhere to write an entry.\n   Pre-built helpers: logNav, logAchievement, logEvent.\n   ================================================================ */\n\nexport interface LogEntry {\n  id: number;\n  ts: number;          // Date.now()\n  sol: number;         // \"Sol\" day (relative to first visit)\n  met: string;         // HH:MM formatted mission elapsed time\n  icon: string;        // Emoji\n  text: string;\n}\n\nconst STORAGE_KEY = 'ares-mission-log';\nconst FIRST_VISIT_KEY = 'ares_first_visit'; // shared with BoardingPass\nconst MAX_ENTRIES = 80;\n\n// ── Helpers ──\nfunction getFirstVisit(): number {\n  const stored = localStorage.getItem(FIRST_VISIT_KEY);\n  if (stored) return new Date(stored).getTime();\n  const now = Date.now();\n  localStorage.setItem(FIRST_VISIT_KEY, new Date(now).toISOString());\n  return now;\n}\n\nfunction calcSol(firstVisit: number, now: number): number {\n  return Math.floor((now - firstVisit) / 86_400_000) + 1;\n}\n\nfunction calcMET(firstVisit: number, now: number): string {\n  const diff = now - firstVisit;\n  const h = Math.floor(diff / 3_600_000);\n  const m = Math.floor((diff % 3_600_000) / 60_000);\n  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;\n}\n\n// ── Context ──\ninterface MissionLogContextValue {\n  entries: LogEntry[];\n  log: (icon: string, text: string) => void;\n  logNav: (pageName: string) => void;\n  logAchievement: (title: string, icon: string) => void;\n  logEvent: (text: string) => void;\n  clearLog: () => void;\n  unreadCount: number;\n  markRead: () => void;\n}\n\nconst MissionLogContext = createContext<MissionLogContextValue | null>(null);\n\nlet _nextId = 0;\n\nexport function MissionLogProvider({ children }: { children: ReactNode }) {\n  const [entries, setEntries] = useState<LogEntry[]>(() => {\n    try {\n      const stored = localStorage.getItem(STORAGE_KEY);\n      const parsed: LogEntry[] = stored ? JSON.parse(stored) : [];\n      // Restore _nextId\n      if (parsed.length > 0) _nextId = Math.max(...parsed.map(e => e.id)) + 1;\n      return parsed;\n    } catch {\n      return [];\n    }\n  });\n\n  const [lastReadCount, setLastReadCount] = useState(() => {\n    try {\n      return Number(localStorage.getItem('ares-log-read') || '0');\n    } catch { return 0; }\n  });\n\n  const firstVisit = getFirstVisit();\n\n  // Persist\n  useEffect(() => {\n    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));\n  }, [entries]);\n\n  // Deduplicate helper: don't write identical text within 5s\n  const recentTexts = useState<Set<string>>(() => new Set())[0];\n\n  const log = useCallback((icon: string, text: string) => {\n    // Dedup\n    const key = `${icon}:${text}`;\n    if (recentTexts.has(key)) return;\n    recentTexts.add(key);\n    setTimeout(() => recentTexts.delete(key), 5000);\n\n    const now = Date.now();\n    const entry: LogEntry = {\n      id: _nextId++,\n      ts: now,\n      sol: calcSol(firstVisit, now),\n      met: calcMET(firstVisit, now),\n      icon,\n      text,\n    };\n    setEntries(prev => {\n      const next = [...prev, entry];\n      return next.length > MAX_ENTRIES ? next.slice(-MAX_ENTRIES) : next;\n    });\n  }, [firstVisit, recentTexts]);\n\n  const logNav = useCallback((pageName: string) => {\n    log('🧭', `Navigated to ${pageName}`);\n  }, [log]);\n\n  const logAchievement = useCallback((title: string, icon: string) => {\n    log('🏆', `Achievement unlocked: ${icon} ${title}`);\n  }, [log]);\n\n  const logEvent = useCallback((text: string) => {\n    log('📡', text);\n  }, [log]);\n\n  const clearLog = useCallback(() => {\n    setEntries([]);\n    _nextId = 0;\n    localStorage.removeItem(STORAGE_KEY);\n  }, []);\n\n  const unreadCount = Math.max(0, entries.length - lastReadCount);\n\n  const markRead = useCallback(() => {\n    setLastReadCount(entries.length);\n    localStorage.setItem('ares-log-read', String(entries.length));\n  }, [entries.length]);\n\n  // Auto-log first visit (only once ever)\n  useEffect(() => {\n    if (entries.length === 0) {\n      log('🚀', 'First contact established. Systems online.');\n    }\n    // eslint-disable-next-line react-hooks/exhaustive-deps\n  }, []);\n\n  return (\n    <MissionLogContext.Provider\n      value={{ entries, log, logNav, logAchievement, logEvent, clearLog, unreadCount, markRead }}\n    >\n      {children}\n    </MissionLogContext.Provider>\n  );\n}\n\nexport function useMissionLog() {\n  const ctx = useContext(MissionLogContext);\n  if (!ctx) throw new Error('useMissionLog must be used within MissionLogProvider');\n  return ctx;\n}\n","encoding":"utf8"}
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+
+/* ================================================================
+   MISSION LOG  —  Captain's Journal
+
+   Automatically records timestamped log entries as the user
+   explores the site.  Entries persist in localStorage.
+
+   Call `log(icon, text)` from anywhere to write an entry.
+   Pre-built helpers: logNav, logAchievement, logEvent.
+   ================================================================ */
+
+export interface LogEntry {
+  id: number;
+  ts: number;          // Date.now()
+  sol: number;         // "Sol" day (relative to first visit)
+  met: string;         // HH:MM formatted mission elapsed time
+  icon: string;        // Emoji
+  text: string;
+}
+
+const STORAGE_KEY = 'ares-mission-log';
+const FIRST_VISIT_KEY = 'ares_first_visit'; // shared with BoardingPass
+const MAX_ENTRIES = 80;
+
+// ── Helpers ──
+function getFirstVisit(): number {
+  const stored = localStorage.getItem(FIRST_VISIT_KEY);
+  if (stored) return new Date(stored).getTime();
+  const now = Date.now();
+  localStorage.setItem(FIRST_VISIT_KEY, new Date(now).toISOString());
+  return now;
+}
+
+function calcSol(firstVisit: number, now: number): number {
+  return Math.floor((now - firstVisit) / 86_400_000) + 1;
+}
+
+function calcMET(firstVisit: number, now: number): string {
+  const diff = now - firstVisit;
+  const h = Math.floor(diff / 3_600_000);
+  const m = Math.floor((diff % 3_600_000) / 60_000);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// ── Context ──
+interface MissionLogContextValue {
+  entries: LogEntry[];
+  log: (icon: string, text: string) => void;
+  logNav: (pageName: string) => void;
+  logAchievement: (title: string, icon: string) => void;
+  logEvent: (text: string) => void;
+  clearLog: () => void;
+  unreadCount: number;
+  markRead: () => void;
+}
+
+const MissionLogContext = createContext<MissionLogContextValue | null>(null);
+
+let _nextId = 0;
+
+export function MissionLogProvider({ children }: { children: ReactNode }) {
+  const [entries, setEntries] = useState<LogEntry[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      const parsed: LogEntry[] = stored ? JSON.parse(stored) : [];
+      // Restore _nextId
+      if (parsed.length > 0) _nextId = Math.max(...parsed.map(e => e.id)) + 1;
+      return parsed;
+    } catch {
+      return [];
+    }
+  });
+
+  const [lastReadCount, setLastReadCount] = useState(() => {
+    try {
+      return Number(localStorage.getItem('ares-log-read') || '0');
+    } catch { return 0; }
+  });
+
+  const firstVisit = getFirstVisit();
+
+  // Persist
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }, [entries]);
+
+  // Deduplicate helper: don't write identical text within 5s
+  const recentTexts = useState<Set<string>>(() => new Set())[0];
+
+  const log = useCallback((icon: string, text: string) => {
+    // Dedup
+    const key = `${icon}:${text}`;
+    if (recentTexts.has(key)) return;
+    recentTexts.add(key);
+    setTimeout(() => recentTexts.delete(key), 5000);
+
+    const now = Date.now();
+    const entry: LogEntry = {
+      id: _nextId++,
+      ts: now,
+      sol: calcSol(firstVisit, now),
+      met: calcMET(firstVisit, now),
+      icon,
+      text,
+    };
+    setEntries(prev => {
+      const next = [...prev, entry];
+      return next.length > MAX_ENTRIES ? next.slice(-MAX_ENTRIES) : next;
+    });
+  }, [firstVisit, recentTexts]);
+
+  const logNav = useCallback((pageName: string) => {
+    log('🧭', `Navigated to ${pageName}`);
+  }, [log]);
+
+  const logAchievement = useCallback((title: string, icon: string) => {
+    log('🏆', `Achievement unlocked: ${icon} ${title}`);
+  }, [log]);
+
+  const logEvent = useCallback((text: string) => {
+    log('📡', text);
+  }, [log]);
+
+  const clearLog = useCallback(() => {
+    setEntries([]);
+    _nextId = 0;
+    localStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  const unreadCount = Math.max(0, entries.length - lastReadCount);
+
+  const markRead = useCallback(() => {
+    setLastReadCount(entries.length);
+    localStorage.setItem('ares-log-read', String(entries.length));
+  }, [entries.length]);
+
+  // Auto-log first visit (only once ever)
+  useEffect(() => {
+    if (entries.length === 0) {
+      log('🚀', 'First contact established. Systems online.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <MissionLogContext.Provider
+      value={{ entries, log, logNav, logAchievement, logEvent, clearLog, unreadCount, markRead }}
+    >
+      {children}
+    </MissionLogContext.Provider>
+  );
+}
+
+export function useMissionLog() {
+  const ctx = useContext(MissionLogContext);
+  if (!ctx) throw new Error('useMissionLog must be used within MissionLogProvider');
+  return ctx;
+}

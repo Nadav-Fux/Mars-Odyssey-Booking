@@ -1,1 +1,90 @@
-{"path":"src/components/OuraRing.tsx","content":"import { type ReactNode } from 'react';\nimport { motion } from 'framer-motion';\n\ninterface OuraRingProps {\n  children: ReactNode;\n  size?: number;\n  color?: string;\n  strokeWidth?: number;\n  className?: string;\n  /** rotation duration in seconds */\n  speed?: number;\n}\n\nexport default function OuraRing({\n  children,\n  size = 56,\n  color = '#FF4500',\n  strokeWidth = 1.5,\n  className = '',\n  speed = 8\n}: OuraRingProps) {\n  const r = 46;\n  const circ = 2 * Math.PI * r;\n\n  return (\n    <div\n    className={`relative flex items-center justify-center ${className}`}\n    style={{ width: size, height: size }}>\n\n      {/* Glow layer */}\n      <div\n      className=\"absolute inset-0 rounded-full blur-md opacity-30\"\n      style={{ backgroundColor: color }} />\n\n\n      {/* Rotating ring SVG */}\n      <motion.svg\n        viewBox=\"0 0 100 100\"\n        className=\"absolute inset-0 w-full h-full\"\n        animate={{ rotate: 360 }}\n        transition={{ duration: speed, repeat: Infinity, ease: 'linear' }}>\n\n        <defs>\n          <linearGradient id={`oura-grad-${color.replace('#', '')}`} x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n            <stop offset=\"0%\" stopColor={color} stopOpacity=\"0.9\" />\n            <stop offset=\"50%\" stopColor={color} stopOpacity=\"0.2\" />\n            <stop offset=\"100%\" stopColor={color} stopOpacity=\"0.8\" />\n          </linearGradient>\n        </defs>\n\n        {/* Dashed arc ring */}\n        <circle\n        cx=\"50\"\n        cy=\"50\"\n        r={r}\n        fill=\"none\"\n        stroke={`url(#oura-grad-${color.replace('#', '')})`}\n        strokeWidth={strokeWidth}\n        strokeDasharray={`${circ * 0.25} ${circ * 0.08} ${circ * 0.15} ${circ * 0.08} ${circ * 0.2} ${circ * 0.08}`}\n        strokeLinecap=\"round\" />\n\n\n        {/* Tiny orbiting dot */}\n        <circle cx=\"50\" cy={50 - r} r=\"2\" fill={color} opacity=\"0.9\">\n          <animateTransform\n          attributeName=\"transform\"\n          type=\"rotate\"\n          from=\"0 50 50\"\n          to=\"-360 50 50\"\n          dur={`${speed * 0.6}s`}\n          repeatCount=\"indefinite\" />\n\n        </circle>\n      </motion.svg>\n\n      {/* Static outer faint ring */}\n      <svg viewBox=\"0 0 100 100\" className=\"absolute inset-0 w-full h-full opacity-15\">\n        <circle\n        cx=\"50\" cy=\"50\" r={r + 2}\n        fill=\"none\" stroke={color} strokeWidth=\"0.5\" />\n\n      </svg>\n\n      {/* Inner icon container */}\n      <div className=\"relative z-10 flex items-center justify-center\">\n        {children}\n      </div>\n    </div>);\n\n}","encoding":"utf8"}
+import { type ReactNode } from 'react';
+import { motion } from 'framer-motion';
+
+interface OuraRingProps {
+  children: ReactNode;
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+  className?: string;
+  /** rotation duration in seconds */
+  speed?: number;
+}
+
+export default function OuraRing({
+  children,
+  size = 56,
+  color = '#FF4500',
+  strokeWidth = 1.5,
+  className = '',
+  speed = 8
+}: OuraRingProps) {
+  const r = 46;
+  const circ = 2 * Math.PI * r;
+
+  return (
+    <div
+    className={`relative flex items-center justify-center ${className}`}
+    style={{ width: size, height: size }}>
+
+      {/* Glow layer */}
+      <div
+      className="absolute inset-0 rounded-full blur-md opacity-30"
+      style={{ backgroundColor: color }} />
+
+
+      {/* Rotating ring SVG */}
+      <motion.svg
+        viewBox="0 0 100 100"
+        className="absolute inset-0 w-full h-full"
+        animate={{ rotate: 360 }}
+        transition={{ duration: speed, repeat: Infinity, ease: 'linear' }}>
+
+        <defs>
+          <linearGradient id={`oura-grad-${color.replace('#', '')}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.9" />
+            <stop offset="50%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.8" />
+          </linearGradient>
+        </defs>
+
+        {/* Dashed arc ring */}
+        <circle
+        cx="50"
+        cy="50"
+        r={r}
+        fill="none"
+        stroke={`url(#oura-grad-${color.replace('#', '')})`}
+        strokeWidth={strokeWidth}
+        strokeDasharray={`${circ * 0.25} ${circ * 0.08} ${circ * 0.15} ${circ * 0.08} ${circ * 0.2} ${circ * 0.08}`}
+        strokeLinecap="round" />
+
+
+        {/* Tiny orbiting dot */}
+        <circle cx="50" cy={50 - r} r="2" fill={color} opacity="0.9">
+          <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 50 50"
+          to="-360 50 50"
+          dur={`${speed * 0.6}s`}
+          repeatCount="indefinite" />
+
+        </circle>
+      </motion.svg>
+
+      {/* Static outer faint ring */}
+      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full opacity-15">
+        <circle
+        cx="50" cy="50" r={r + 2}
+        fill="none" stroke={color} strokeWidth="0.5" />
+
+      </svg>
+
+      {/* Inner icon container */}
+      <div className="relative z-10 flex items-center justify-center">
+        {children}
+      </div>
+    </div>);
+
+}

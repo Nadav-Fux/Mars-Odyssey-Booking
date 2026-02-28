@@ -1,1 +1,28 @@
-{"path":"src/hooks/useAlertMode.ts","content":"import { useState, useEffect, useCallback } from 'react';\n\nexport function useAlertMode() {\n  const [active, setActive] = useState(false);\n\n  const toggle = useCallback(() => setActive((a) => !a), []);\n\n  useEffect(() => {\n    const onKey = (e: KeyboardEvent) => {\n      if (e.key === 'm' || e.key === 'M') {\n        // Ignore if typing in input\n        const tag = (e.target as HTMLElement).tagName;\n        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;\n        toggle();\n      }\n    };\n    window.addEventListener('keydown', onKey);\n    return () => window.removeEventListener('keydown', onKey);\n  }, [toggle]);\n\n  // Toggle body class for global CSS targeting\n  useEffect(() => {\n    document.documentElement.classList.toggle('alert-mode', active);\n    return () => document.documentElement.classList.remove('alert-mode');\n  }, [active]);\n\n  return { alertMode: active, toggleAlert: toggle };\n}\n","encoding":"utf8"}
+import { useState, useEffect, useCallback } from 'react';
+
+export function useAlertMode() {
+  const [active, setActive] = useState(false);
+
+  const toggle = useCallback(() => setActive((a) => !a), []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'm' || e.key === 'M') {
+        // Ignore if typing in input
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        toggle();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggle]);
+
+  // Toggle body class for global CSS targeting
+  useEffect(() => {
+    document.documentElement.classList.toggle('alert-mode', active);
+    return () => document.documentElement.classList.remove('alert-mode');
+  }, [active]);
+
+  return { alertMode: active, toggleAlert: toggle };
+}

@@ -1,1 +1,95 @@
-{"path":"src/components/RevealText.tsx","content":"import { useRef, useEffect, useMemo, memo } from 'react';\nimport { gsap } from '@/lib/gsap';\nimport { ScrollTrigger } from '@/lib/gsap';\n\n/**\n * RevealText\n *\n * Splits children text into individual <span>-wrapped words.\n * Each word fades in (0 → 1 opacity) with a slight upward slide\n * (12px → 0) triggered by GSAP ScrollTrigger when the paragraph\n * enters the viewport.\n *\n * Props:\n *  • text        — the paragraph string\n *  • className   — styling on the outer <p> wrapper\n *  • stagger     — delay between each word (default 0.045s)\n *  • duration    — per-word animation duration (default 0.5s)\n *  • y           — upward slide distance (default 12)\n *  • start       — ScrollTrigger start (default 'top 88%')\n *  • as          — HTML tag (default 'p')\n */\n\ninterface RevealTextProps {\n  text: string;\n  className?: string;\n  stagger?: number;\n  duration?: number;\n  y?: number;\n  start?: string;\n  as?: 'p' | 'span' | 'div';\n}\n\nfunction RevealText({\n  text,\n  className = '',\n  stagger = 0.045,\n  duration = 0.5,\n  y: slideY = 12,\n  start = 'top 88%',\n  as: Tag = 'p'\n}: RevealTextProps) {\n  const containerRef = useRef<HTMLElement>(null);\n  const hasAnimated = useRef(false);\n\n  // Split into words once\n  const words = useMemo(() => text.split(/\\s+/).filter(Boolean), [text]);\n\n  useEffect(() => {\n    const el = containerRef.current;\n    if (!el || hasAnimated.current) return;\n\n    const wordEls = el.querySelectorAll<HTMLSpanElement>('.rv-word');\n    if (!wordEls.length) return;\n\n    // Set initial state\n    gsap.set(wordEls, { opacity: 0, y: slideY });\n\n    const trigger = ScrollTrigger.create({\n      trigger: el,\n      start,\n      once: true,\n      onEnter: () => {\n        hasAnimated.current = true;\n        gsap.to(wordEls, {\n          opacity: 1,\n          y: 0,\n          duration,\n          stagger,\n          ease: 'expo.out'\n        });\n      }\n    });\n\n    return () => {\n      trigger.kill();\n    };\n  }, [words, stagger, duration, slideY, start]);\n\n  return (\n    // @ts-ignore — Tag is a valid HTML element\n    <Tag ref={containerRef as any} className={className}>\n      {words.map((word, i) =>\n      <span\n      key={`${word}-${i}`}\n      className=\"rv-word inline-block\"\n      style={{ opacity: 0, marginRight: '0.3em' }}>\n\n          {word}\n        </span>\n      )}\n    </Tag>);\n\n}\n\nexport default memo(RevealText);","encoding":"utf8"}
+import { useRef, useEffect, useMemo, memo } from 'react';
+import { gsap } from '@/lib/gsap';
+import { ScrollTrigger } from '@/lib/gsap';
+
+/**
+ * RevealText
+ *
+ * Splits children text into individual <span>-wrapped words.
+ * Each word fades in (0 → 1 opacity) with a slight upward slide
+ * (12px → 0) triggered by GSAP ScrollTrigger when the paragraph
+ * enters the viewport.
+ *
+ * Props:
+ *  • text        — the paragraph string
+ *  • className   — styling on the outer <p> wrapper
+ *  • stagger     — delay between each word (default 0.045s)
+ *  • duration    — per-word animation duration (default 0.5s)
+ *  • y           — upward slide distance (default 12)
+ *  • start       — ScrollTrigger start (default 'top 88%')
+ *  • as          — HTML tag (default 'p')
+ */
+
+interface RevealTextProps {
+  text: string;
+  className?: string;
+  stagger?: number;
+  duration?: number;
+  y?: number;
+  start?: string;
+  as?: 'p' | 'span' | 'div';
+}
+
+function RevealText({
+  text,
+  className = '',
+  stagger = 0.045,
+  duration = 0.5,
+  y: slideY = 12,
+  start = 'top 88%',
+  as: Tag = 'p'
+}: RevealTextProps) {
+  const containerRef = useRef<HTMLElement>(null);
+  const hasAnimated = useRef(false);
+
+  // Split into words once
+  const words = useMemo(() => text.split(/\s+/).filter(Boolean), [text]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || hasAnimated.current) return;
+
+    const wordEls = el.querySelectorAll<HTMLSpanElement>('.rv-word');
+    if (!wordEls.length) return;
+
+    // Set initial state
+    gsap.set(wordEls, { opacity: 0, y: slideY });
+
+    const trigger = ScrollTrigger.create({
+      trigger: el,
+      start,
+      once: true,
+      onEnter: () => {
+        hasAnimated.current = true;
+        gsap.to(wordEls, {
+          opacity: 1,
+          y: 0,
+          duration,
+          stagger,
+          ease: 'expo.out'
+        });
+      }
+    });
+
+    return () => {
+      trigger.kill();
+    };
+  }, [words, stagger, duration, slideY, start]);
+
+  return (
+    // @ts-ignore — Tag is a valid HTML element
+    <Tag ref={containerRef as any} className={className}>
+      {words.map((word, i) =>
+      <span
+      key={`${word}-${i}`}
+      className="rv-word inline-block"
+      style={{ opacity: 0, marginRight: '0.3em' }}>
+
+          {word}
+        </span>
+      )}
+    </Tag>);
+
+}
+
+export default memo(RevealText);

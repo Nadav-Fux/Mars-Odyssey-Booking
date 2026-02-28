@@ -1,1 +1,183 @@
-{"path":"src/components/ShipAI.tsx","content":"import { useState, useEffect, useRef, useCallback, memo } from 'react';\nimport { AnimatePresence, motion } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useBatterySaver } from '@/hooks/useBatterySaver';\n\n/* ================================================================\n   ARIA  —  Ship AI Ambient System\n\n   After ~40s of user inactivity, shows subtle ambient messages\n   from the spacecraft's onboard AI (\"ARIA\").  Creates a living,\n   breathing sci-fi atmosphere.\n\n   • Non-blocking: tiny toast at bottom-center\n   • Self-dismisses after 6s\n   • Won't repeat same message twice in a row\n   • Resets idle timer on any interaction\n   • Disabled by Battery Saver\n   • Once per ~45-70s (randomised gap)\n   ================================================================ */\n\n// ── Message pools ──\n\nconst AMBIENT: string[] = [\n'All systems nominal, Commander.',\n'Holding course. Mars approach on schedule.',\n'Micro-meteorite deflected. Shields at 100%.',\n'Solar array efficiency: 97.3%. Optimal.',\n'Crew vitals nominal. All six members resting.',\n'Deep space relay uplink stable.',\n'Cabin pressure: 101.3 kPa. Comfortable.',\n'Running routine reactor diagnostics…',\n'Star field calibration complete.',\n'Next course correction in 4 hours 22 minutes.',\n'Oxygen recyclers operating at full capacity.',\n'Cosmic radiation levels within safe limits.',\n'Fuel reserves at 88%. Well within margins.',\n'External hull temperature: −167 °C.',\n'Communication latency to Earth: 14 min 22 s.',\n'Automated telescope survey in progress.',\n'Water reclamation cycle completed successfully.',\n'Mars is now the brightest object in our forward view.',\n'Gravitational assist trajectory confirmed nominal.',\n'Running memory integrity check… all banks clear.'];\n\n\nconst IDLE_LONG: string[] = [\n'Commander, are you still with us?',\n'Awaiting your orders, Commander.',\n'Standing by for instructions.',\n'I\\'m here whenever you need me, Commander.',\n'Mission continues on autopilot.'];\n\n\nconst IDLE_THRESHOLD = 40_000; // 40s before first message\nconst MSG_GAP_MIN = 45_000; // min gap between messages\nconst MSG_GAP_MAX = 70_000; // max gap\nconst DISPLAY_TIME = 6_500; // how long toast stays visible\nconst LONG_IDLE = 120_000; // 2min idle → switch to IDLE_LONG pool\n\nfunction ShipAI() {\n  const { isSaving: isBatterySaver } = useBatterySaver();\n  const [message, setMessage] = useState<string | null>(null);\n  const [visible, setVisible] = useState(false);\n\n  const lastActivity = useRef(Date.now());\n  const lastMsgIdx = useRef(-1);\n  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const dismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);\n  const idleSince = useRef(Date.now());\n  const shownCount = useRef(0); // total shown this session\n\n  // Reset idle timer on interaction\n  useEffect(() => {\n    function onActivity() {\n      lastActivity.current = Date.now();\n      if (shownCount.current === 0) {\n        idleSince.current = Date.now(); // reset \"first idle\" tracker too\n      }\n    }\n    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];\n    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));\n    return () => events.forEach((e) => window.removeEventListener(e, onActivity));\n  }, []);\n\n  // Pick a message (no repeats)\n  const pickMessage = useCallback(() => {\n    const idleTime = Date.now() - lastActivity.current;\n    const pool = idleTime > LONG_IDLE ? IDLE_LONG : AMBIENT;\n    let idx: number;\n    do {\n      idx = Math.floor(Math.random() * pool.length);\n    } while (idx === lastMsgIdx.current && pool.length > 1);\n    lastMsgIdx.current = idx;\n    return pool[idx];\n  }, []);\n\n  // Show a message\n  const showMessage = useCallback(() => {\n    const msg = pickMessage();\n    setMessage(msg);\n    setVisible(true);\n    shownCount.current++;\n\n    // Auto-dismiss\n    if (dismissRef.current) clearTimeout(dismissRef.current);\n    dismissRef.current = setTimeout(() => setVisible(false), DISPLAY_TIME);\n  }, [pickMessage]);\n\n  // Schedule next check\n  const scheduleNext = useCallback(() => {\n    if (timerRef.current) clearTimeout(timerRef.current);\n    const gap = MSG_GAP_MIN + Math.random() * (MSG_GAP_MAX - MSG_GAP_MIN);\n    timerRef.current = setTimeout(() => {\n      const idleTime = Date.now() - lastActivity.current;\n      if (idleTime >= IDLE_THRESHOLD && !isBatterySaver) {\n        showMessage();\n      }\n      scheduleNext();\n    }, gap);\n  }, [isBatterySaver, showMessage]);\n\n  // Initial idle check + scheduling\n  useEffect(() => {\n    // First message after IDLE_THRESHOLD\n    const initialTimer = setTimeout(() => {\n      const idleTime = Date.now() - lastActivity.current;\n      if (idleTime >= IDLE_THRESHOLD && !isBatterySaver) {\n        showMessage();\n      }\n      scheduleNext();\n    }, IDLE_THRESHOLD);\n\n    return () => {\n      clearTimeout(initialTimer);\n      if (timerRef.current) clearTimeout(timerRef.current);\n      if (dismissRef.current) clearTimeout(dismissRef.current);\n    };\n  }, [isBatterySaver, showMessage, scheduleNext]);\n\n  // Don't render during battery saver\n  if (isBatterySaver) return null;\n\n  return (\n    <div className=\"fixed bottom-20 left-1/2 -translate-x-1/2 z-[90] pointer-events-none\">\n      <AnimatePresence>\n        {visible && message &&\n        <motion.div\n          initial={{ opacity: 0, y: 16, scale: 0.95 }}\n          animate={{ opacity: 1, y: 0, scale: 1 }}\n          exit={{ opacity: 0, y: -8, scale: 0.97 }}\n          transition={{ duration: 0.5, ease: EXPO_OUT }}\n          className=\"flex items-center gap-2.5 px-4 py-2 rounded-full\n              bg-white/[0.04] border border-white/[0.06] backdrop-blur-md\n              shadow-[0_0_30px_rgba(0,0,0,0.3)]\">\n\n\n\n            {/* AI indicator dot */}\n            <div className=\"relative flex-shrink-0\">\n              <div className=\"w-1.5 h-1.5 rounded-full bg-cyan-400/70\" />\n              <div className=\"absolute inset-0 w-1.5 h-1.5 rounded-full bg-cyan-400/40 animate-ping\" />\n            </div>\n\n            {/* Label */}\n            <span className=\"text-[8px] font-display tracking-[0.18em] text-cyan-400/40 font-bold flex-shrink-0\">\n              ARIA\n            </span>\n\n            {/* Divider */}\n            <div className=\"w-px h-3 bg-white/[0.06]\" />\n\n            {/* Message */}\n            <span className=\"text-[11px] font-mono text-white/40 whitespace-nowrap\">\n              {message}\n            </span>\n          </motion.div>\n        }\n      </AnimatePresence>\n    </div>);\n\n}\n\nexport default memo(ShipAI);","encoding":"utf8"}
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+import { useBatterySaver } from '@/hooks/useBatterySaver';
+
+/* ================================================================
+   ARIA  —  Ship AI Ambient System
+
+   After ~40s of user inactivity, shows subtle ambient messages
+   from the spacecraft's onboard AI ("ARIA").  Creates a living,
+   breathing sci-fi atmosphere.
+
+   • Non-blocking: tiny toast at bottom-center
+   • Self-dismisses after 6s
+   • Won't repeat same message twice in a row
+   • Resets idle timer on any interaction
+   • Disabled by Battery Saver
+   • Once per ~45-70s (randomised gap)
+   ================================================================ */
+
+// ── Message pools ──
+
+const AMBIENT: string[] = [
+'All systems nominal, Commander.',
+'Holding course. Mars approach on schedule.',
+'Micro-meteorite deflected. Shields at 100%.',
+'Solar array efficiency: 97.3%. Optimal.',
+'Crew vitals nominal. All six members resting.',
+'Deep space relay uplink stable.',
+'Cabin pressure: 101.3 kPa. Comfortable.',
+'Running routine reactor diagnostics…',
+'Star field calibration complete.',
+'Next course correction in 4 hours 22 minutes.',
+'Oxygen recyclers operating at full capacity.',
+'Cosmic radiation levels within safe limits.',
+'Fuel reserves at 88%. Well within margins.',
+'External hull temperature: −167 °C.',
+'Communication latency to Earth: 14 min 22 s.',
+'Automated telescope survey in progress.',
+'Water reclamation cycle completed successfully.',
+'Mars is now the brightest object in our forward view.',
+'Gravitational assist trajectory confirmed nominal.',
+'Running memory integrity check… all banks clear.'];
+
+
+const IDLE_LONG: string[] = [
+'Commander, are you still with us?',
+'Awaiting your orders, Commander.',
+'Standing by for instructions.',
+'I\'m here whenever you need me, Commander.',
+'Mission continues on autopilot.'];
+
+
+const IDLE_THRESHOLD = 40_000; // 40s before first message
+const MSG_GAP_MIN = 45_000; // min gap between messages
+const MSG_GAP_MAX = 70_000; // max gap
+const DISPLAY_TIME = 6_500; // how long toast stays visible
+const LONG_IDLE = 120_000; // 2min idle → switch to IDLE_LONG pool
+
+function ShipAI() {
+  const { isSaving: isBatterySaver } = useBatterySaver();
+  const [message, setMessage] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  const lastActivity = useRef(Date.now());
+  const lastMsgIdx = useRef(-1);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleSince = useRef(Date.now());
+  const shownCount = useRef(0); // total shown this session
+
+  // Reset idle timer on interaction
+  useEffect(() => {
+    function onActivity() {
+      lastActivity.current = Date.now();
+      if (shownCount.current === 0) {
+        idleSince.current = Date.now(); // reset "first idle" tracker too
+      }
+    }
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    return () => events.forEach((e) => window.removeEventListener(e, onActivity));
+  }, []);
+
+  // Pick a message (no repeats)
+  const pickMessage = useCallback(() => {
+    const idleTime = Date.now() - lastActivity.current;
+    const pool = idleTime > LONG_IDLE ? IDLE_LONG : AMBIENT;
+    let idx: number;
+    do {
+      idx = Math.floor(Math.random() * pool.length);
+    } while (idx === lastMsgIdx.current && pool.length > 1);
+    lastMsgIdx.current = idx;
+    return pool[idx];
+  }, []);
+
+  // Show a message
+  const showMessage = useCallback(() => {
+    const msg = pickMessage();
+    setMessage(msg);
+    setVisible(true);
+    shownCount.current++;
+
+    // Auto-dismiss
+    if (dismissRef.current) clearTimeout(dismissRef.current);
+    dismissRef.current = setTimeout(() => setVisible(false), DISPLAY_TIME);
+  }, [pickMessage]);
+
+  // Schedule next check
+  const scheduleNext = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const gap = MSG_GAP_MIN + Math.random() * (MSG_GAP_MAX - MSG_GAP_MIN);
+    timerRef.current = setTimeout(() => {
+      const idleTime = Date.now() - lastActivity.current;
+      if (idleTime >= IDLE_THRESHOLD && !isBatterySaver) {
+        showMessage();
+      }
+      scheduleNext();
+    }, gap);
+  }, [isBatterySaver, showMessage]);
+
+  // Initial idle check + scheduling
+  useEffect(() => {
+    // First message after IDLE_THRESHOLD
+    const initialTimer = setTimeout(() => {
+      const idleTime = Date.now() - lastActivity.current;
+      if (idleTime >= IDLE_THRESHOLD && !isBatterySaver) {
+        showMessage();
+      }
+      scheduleNext();
+    }, IDLE_THRESHOLD);
+
+    return () => {
+      clearTimeout(initialTimer);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (dismissRef.current) clearTimeout(dismissRef.current);
+    };
+  }, [isBatterySaver, showMessage, scheduleNext]);
+
+  // Don't render during battery saver
+  if (isBatterySaver) return null;
+
+  return (
+    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[90] pointer-events-none">
+      <AnimatePresence>
+        {visible && message &&
+        <motion.div
+          initial={{ opacity: 0, y: 16, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -8, scale: 0.97 }}
+          transition={{ duration: 0.5, ease: EXPO_OUT }}
+          className="flex items-center gap-2.5 px-4 py-2 rounded-full
+              bg-white/[0.04] border border-white/[0.06] backdrop-blur-md
+              shadow-[0_0_30px_rgba(0,0,0,0.3)]">
+
+
+
+            {/* AI indicator dot */}
+            <div className="relative flex-shrink-0">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/70" />
+              <div className="absolute inset-0 w-1.5 h-1.5 rounded-full bg-cyan-400/40 animate-ping" />
+            </div>
+
+            {/* Label */}
+            <span className="text-[8px] font-display tracking-[0.18em] text-cyan-400/40 font-bold flex-shrink-0">
+              ARIA
+            </span>
+
+            {/* Divider */}
+            <div className="w-px h-3 bg-white/[0.06]" />
+
+            {/* Message */}
+            <span className="text-[11px] font-mono text-white/40 whitespace-nowrap">
+              {message}
+            </span>
+          </motion.div>
+        }
+      </AnimatePresence>
+    </div>);
+
+}
+
+export default memo(ShipAI);

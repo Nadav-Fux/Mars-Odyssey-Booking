@@ -1,1 +1,133 @@
-{"path":"src/hooks/useDiscoveryMode.tsx","content":"import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';\n\ninterface DiscoveryCtx {\n  isActive: boolean;\n  toggle: () => void;\n  /** Index of the currently highlighted concept (-1 = none) */\n  activeIndex: number;\n  setActiveIndex: (i: number) => void;\n  next: () => void;\n  prev: () => void;\n  totalConcepts: number;\n}\n\nconst DiscoveryContext = createContext<DiscoveryCtx>({\n  isActive: false,\n  toggle: () => {},\n  activeIndex: -1,\n  setActiveIndex: () => {},\n  next: () => {},\n  prev: () => {},\n  totalConcepts: 0,\n});\n\nexport interface DiscoveryConcept {\n  /** CSS selector to highlight */\n  selector: string;\n  /** Title of the concept */\n  title: string;\n  /** Explanation */\n  description: string;\n  /** Tech category */\n  category: 'animation' | 'design' | 'interaction' | 'performance' | 'accessibility';\n}\n\nexport const CONCEPTS: DiscoveryConcept[] = [\n  {\n    selector: '.mars-scroll-wrap',\n    title: 'GSAP ScrollTrigger',\n    description:\n      'The Mars globe scales and rotates on scroll using GSAP\\'s ScrollTrigger plugin with scrub, creating a parallax 3D effect without any scroll-jacking.',\n    category: 'animation',\n  },\n  {\n    selector: '.hero-cta-group',\n    title: 'Magnetic Cursor',\n    description:\n      'These buttons use spring physics to follow your cursor within a magnetic radius. The text layer moves independently from the button shell for a layered, tactile feel.',\n    category: 'interaction',\n  },\n  {\n    selector: '#destinations',\n    title: 'Intersection Observer Reveals',\n    description:\n      'Section content animates in only when scrolled into view, using IntersectionObserver-driven GSAP timelines. This avoids rendering off-screen animations.',\n    category: 'performance',\n  },\n  {\n    selector: '#experience',\n    title: 'Staggered Motion',\n    description:\n      'Timeline items appear with calculated stagger delays and Expo easing curves ([0.16, 1, 0.3, 1]) for a cascading, editorial reveal effect.',\n    category: 'animation',\n  },\n  {\n    selector: '.cabin-deck',\n    title: 'Card Stack Physics',\n    description:\n      'Cabin cards use spring-based dragging with velocity tracking. Flick gestures calculate momentum to snap to the next card — mimicking native iOS card physics.',\n    category: 'interaction',\n  },\n  {\n    selector: 'nav',\n    title: 'Vertical Nav + Active Section',\n    description:\n      'The navigation tracks the active section using IntersectionObserver thresholds and highlights accordingly. It\\'s fully keyboard-navigable with ARIA landmarks.',\n    category: 'accessibility',\n  },\n  {\n    selector: '.scanline-overlay',\n    title: 'CRT Scanline Effect',\n    description:\n      'A pointer-events: none overlay renders 1px CSS repeating gradients and an animated sweep, simulating a retro CRT monitor. Zero JS cost — pure CSS.',\n    category: 'design',\n  },\n  {\n    selector: '#fleet',\n    title: 'Token-Driven Design',\n    description:\n      'Every color, radius, and font references CSS custom properties from theme.css. Changing one token updates the entire site — no hardcoded values anywhere.',\n    category: 'design',\n  },\n];\n\nexport function DiscoveryProvider({ children }: { children: ReactNode }) {\n  const [isActive, setIsActive] = useState(false);\n  const [activeIndex, setActiveIndex] = useState(-1);\n\n  const toggle = useCallback(() => {\n    setIsActive((prev) => {\n      if (prev) setActiveIndex(-1);\n      else setActiveIndex(0);\n      return !prev;\n    });\n  }, []);\n\n  const next = useCallback(() => {\n    setActiveIndex((i) => (i + 1) % CONCEPTS.length);\n  }, []);\n\n  const prev = useCallback(() => {\n    setActiveIndex((i) => (i - 1 + CONCEPTS.length) % CONCEPTS.length);\n  }, []);\n\n  return (\n    <DiscoveryContext.Provider\n      value={{\n        isActive,\n        toggle,\n        activeIndex,\n        setActiveIndex,\n        next,\n        prev,\n        totalConcepts: CONCEPTS.length,\n      }}\n    >\n      {children}\n    </DiscoveryContext.Provider>\n  );\n}\n\nexport function useDiscoveryMode() {\n  return useContext(DiscoveryContext);\n}\n","encoding":"utf8"}
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+
+interface DiscoveryCtx {
+  isActive: boolean;
+  toggle: () => void;
+  /** Index of the currently highlighted concept (-1 = none) */
+  activeIndex: number;
+  setActiveIndex: (i: number) => void;
+  next: () => void;
+  prev: () => void;
+  totalConcepts: number;
+}
+
+const DiscoveryContext = createContext<DiscoveryCtx>({
+  isActive: false,
+  toggle: () => {},
+  activeIndex: -1,
+  setActiveIndex: () => {},
+  next: () => {},
+  prev: () => {},
+  totalConcepts: 0,
+});
+
+export interface DiscoveryConcept {
+  /** CSS selector to highlight */
+  selector: string;
+  /** Title of the concept */
+  title: string;
+  /** Explanation */
+  description: string;
+  /** Tech category */
+  category: 'animation' | 'design' | 'interaction' | 'performance' | 'accessibility';
+}
+
+export const CONCEPTS: DiscoveryConcept[] = [
+  {
+    selector: '.mars-scroll-wrap',
+    title: 'GSAP ScrollTrigger',
+    description:
+      'The Mars globe scales and rotates on scroll using GSAP\'s ScrollTrigger plugin with scrub, creating a parallax 3D effect without any scroll-jacking.',
+    category: 'animation',
+  },
+  {
+    selector: '.hero-cta-group',
+    title: 'Magnetic Cursor',
+    description:
+      'These buttons use spring physics to follow your cursor within a magnetic radius. The text layer moves independently from the button shell for a layered, tactile feel.',
+    category: 'interaction',
+  },
+  {
+    selector: '#destinations',
+    title: 'Intersection Observer Reveals',
+    description:
+      'Section content animates in only when scrolled into view, using IntersectionObserver-driven GSAP timelines. This avoids rendering off-screen animations.',
+    category: 'performance',
+  },
+  {
+    selector: '#experience',
+    title: 'Staggered Motion',
+    description:
+      'Timeline items appear with calculated stagger delays and Expo easing curves ([0.16, 1, 0.3, 1]) for a cascading, editorial reveal effect.',
+    category: 'animation',
+  },
+  {
+    selector: '.cabin-deck',
+    title: 'Card Stack Physics',
+    description:
+      'Cabin cards use spring-based dragging with velocity tracking. Flick gestures calculate momentum to snap to the next card — mimicking native iOS card physics.',
+    category: 'interaction',
+  },
+  {
+    selector: 'nav',
+    title: 'Vertical Nav + Active Section',
+    description:
+      'The navigation tracks the active section using IntersectionObserver thresholds and highlights accordingly. It\'s fully keyboard-navigable with ARIA landmarks.',
+    category: 'accessibility',
+  },
+  {
+    selector: '.scanline-overlay',
+    title: 'CRT Scanline Effect',
+    description:
+      'A pointer-events: none overlay renders 1px CSS repeating gradients and an animated sweep, simulating a retro CRT monitor. Zero JS cost — pure CSS.',
+    category: 'design',
+  },
+  {
+    selector: '#fleet',
+    title: 'Token-Driven Design',
+    description:
+      'Every color, radius, and font references CSS custom properties from theme.css. Changing one token updates the entire site — no hardcoded values anywhere.',
+    category: 'design',
+  },
+];
+
+export function DiscoveryProvider({ children }: { children: ReactNode }) {
+  const [isActive, setIsActive] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  const toggle = useCallback(() => {
+    setIsActive((prev) => {
+      if (prev) setActiveIndex(-1);
+      else setActiveIndex(0);
+      return !prev;
+    });
+  }, []);
+
+  const next = useCallback(() => {
+    setActiveIndex((i) => (i + 1) % CONCEPTS.length);
+  }, []);
+
+  const prev = useCallback(() => {
+    setActiveIndex((i) => (i - 1 + CONCEPTS.length) % CONCEPTS.length);
+  }, []);
+
+  return (
+    <DiscoveryContext.Provider
+      value={{
+        isActive,
+        toggle,
+        activeIndex,
+        setActiveIndex,
+        next,
+        prev,
+        totalConcepts: CONCEPTS.length,
+      }}
+    >
+      {children}
+    </DiscoveryContext.Provider>
+  );
+}
+
+export function useDiscoveryMode() {
+  return useContext(DiscoveryContext);
+}

@@ -1,1 +1,264 @@
-{"path":"src/components/SpaceAudio.tsx","content":"import { useState, useRef, useEffect, useCallback } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { Volume2, VolumeX } from 'lucide-react';\n\nconst BAR_COUNT = 52;\n\nfunction createSpaceSoundscape(ctx: AudioContext) {\n  const master = ctx.createGain();\n  master.gain.value = 0;\n  master.connect(ctx.destination);\n\n  // Deep sub-bass drone\n  const drone = ctx.createOscillator();\n  drone.type = 'sine';\n  drone.frequency.value = 42;\n  const droneG = ctx.createGain();\n  droneG.gain.value = 0.14;\n  drone.connect(droneG).connect(master);\n  drone.start();\n\n  // LFO on drone\n  const lfo = ctx.createOscillator();\n  lfo.type = 'sine';\n  lfo.frequency.value = 0.05;\n  const lfoG = ctx.createGain();\n  lfoG.gain.value = 3;\n  lfo.connect(lfoG).connect(drone.frequency);\n  lfo.start();\n\n  // Cosmic hiss (filtered noise)\n  const bufLen = ctx.sampleRate * 4;\n  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);\n  const d = buf.getChannelData(0);\n  for (let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * 0.5;\n  const noise = ctx.createBufferSource();\n  noise.buffer = buf;\n  noise.loop = true;\n  const nf = ctx.createBiquadFilter();\n  nf.type = 'lowpass';\n  nf.frequency.value = 220;\n  nf.Q.value = 0.8;\n  const ng = ctx.createGain();\n  ng.gain.value = 0.07;\n  noise.connect(nf).connect(ng).connect(master);\n  noise.start();\n\n  // LFO on noise filter\n  const nfLfo = ctx.createOscillator();\n  nfLfo.type = 'sine';\n  nfLfo.frequency.value = 0.03;\n  const nfLfoG = ctx.createGain();\n  nfLfoG.gain.value = 80;\n  nfLfo.connect(nfLfoG).connect(nf.frequency);\n  nfLfo.start();\n\n  // Ethereal pad (two detuned sines)\n  const pad1 = ctx.createOscillator();\n  pad1.type = 'sine';\n  pad1.frequency.value = 110;\n  const pad2 = ctx.createOscillator();\n  pad2.type = 'sine';\n  pad2.frequency.value = 112.5;\n  const pg = ctx.createGain();\n  pg.gain.value = 0.035;\n  pad1.connect(pg);\n  pad2.connect(pg);\n  pg.connect(master);\n  pad1.start();\n  pad2.start();\n\n  // Pad sweep\n  const pLfo = ctx.createOscillator();\n  pLfo.type = 'triangle';\n  pLfo.frequency.value = 0.02;\n  const pLfoG = ctx.createGain();\n  pLfoG.gain.value = 8;\n  pLfo.connect(pLfoG).connect(pad1.frequency);\n  pLfo.connect(pLfoG).connect(pad2.frequency);\n  pLfo.start();\n\n  // High shimmer\n  const shim = ctx.createOscillator();\n  shim.type = 'sine';\n  shim.frequency.value = 880;\n  const shimG = ctx.createGain();\n  shimG.gain.value = 0.008;\n  shim.connect(shimG).connect(master);\n  shim.start();\n  const shimLfo = ctx.createOscillator();\n  shimLfo.type = 'sine';\n  shimLfo.frequency.value = 0.15;\n  const shimLfoG = ctx.createGain();\n  shimLfoG.gain.value = 0.006;\n  shimLfo.connect(shimLfoG).connect(shimG.gain);\n  shimLfo.start();\n\n  // Analyser for visualizer\n  const analyser = ctx.createAnalyser();\n  analyser.fftSize = 256;\n  analyser.smoothingTimeConstant = 0.82;\n  master.connect(analyser);\n\n  return { master, analyser, stop: () => {\n      [drone, lfo, noise, pad1, pad2, nfLfo, pLfo, shim, shimLfo].forEach((n) => {\n        try {n.stop();} catch {}\n      });\n    } };\n}\n\nexport default function SpaceAudio() {\n  const [active, setActive] = useState(false);\n  const [showVis, setShowVis] = useState(false);\n  const ctxRef = useRef<AudioContext | null>(null);\n  const soundRef = useRef<ReturnType<typeof createSpaceSoundscape> | null>(null);\n  const frameRef = useRef(0);\n  const barsRef = useRef<number[]>(new Array(BAR_COUNT).fill(0));\n  const [bars, setBars] = useState<number[]>(new Array(BAR_COUNT).fill(0));\n\n  const toggle = useCallback(() => {\n    if (!active) {\n      // Start audio\n      const ctx = new AudioContext();\n      ctxRef.current = ctx;\n      const sound = createSpaceSoundscape(ctx);\n      soundRef.current = sound;\n\n      // Fade in\n      sound.master.gain.setValueAtTime(0, ctx.currentTime);\n      sound.master.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 2);\n\n      setActive(true);\n      setShowVis(true);\n\n      // Visualizer loop\n      const dataArray = new Uint8Array(sound.analyser.frequencyBinCount);\n      const tick = () => {\n        sound.analyser.getByteFrequencyData(dataArray);\n        const step = Math.floor(dataArray.length / BAR_COUNT);\n        const newBars: number[] = [];\n        for (let i = 0; i < BAR_COUNT; i++) {\n          // Average nearby bins\n          let sum = 0;\n          for (let j = 0; j < step; j++) sum += dataArray[i * step + j] || 0;\n          newBars.push(sum / step / 255);\n        }\n        barsRef.current = newBars;\n        setBars([...newBars]);\n        frameRef.current = requestAnimationFrame(tick);\n      };\n      frameRef.current = requestAnimationFrame(tick);\n    } else {\n      // Fade out\n      const ctx = ctxRef.current;\n      const sound = soundRef.current;\n      if (ctx && sound) {\n        sound.master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);\n        setTimeout(() => {\n          cancelAnimationFrame(frameRef.current);\n          sound.stop();\n          ctx.close();\n          ctxRef.current = null;\n          soundRef.current = null;\n          setShowVis(false);\n          setBars(new Array(BAR_COUNT).fill(0));\n        }, 1600);\n      }\n      setActive(false);\n    }\n  }, [active]);\n\n  // Cleanup on unmount\n  useEffect(() => {\n    return () => {\n      cancelAnimationFrame(frameRef.current);\n      soundRef.current?.stop();\n      ctxRef.current?.close();\n    };\n  }, []);\n\n  return (\n    <>\n      {/* Toggle button */}\n      <motion.button\n        onClick={toggle}\n        className={`fixed bottom-5 right-5 lg:bottom-16 lg:right-5 z-50 w-11 h-11 rounded-xl flex items-center justify-center transition-all border ${\n        active ?\n        'bg-primary/15 border-primary/30 text-primary shadow-lg shadow-primary/20' :\n        'bg-white/[0.04] border-white/[0.08] text-white/30 hover:text-white/60 hover:bg-white/[0.08]'}`\n        }\n        whileHover={{ scale: 1.08 }}\n        whileTap={{ scale: 0.92 }}\n        title={active ? 'Mute Deep Space Audio' : 'Enable Deep Space Audio'}>\n\n        {active ? <Volume2 className=\"w-4 h-4\" /> : <VolumeX className=\"w-4 h-4\" />}\n        {active &&\n        <motion.div\n          className=\"absolute inset-0 rounded-xl border border-primary/40\"\n          animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}\n          transition={{ duration: 2, repeat: Infinity }} />\n\n        }\n      </motion.button>\n\n      {/* Frequency visualizer bar */}\n      <AnimatePresence>\n        {showVis &&\n        <motion.div\n          className=\"fixed bottom-0 left-0 right-0 z-40 pointer-events-none\"\n          initial={{ opacity: 0, y: 20 }}\n          animate={{ opacity: 1, y: 0 }}\n          exit={{ opacity: 0, y: 20 }}\n          transition={{ duration: 0.6, ease: EXPO_OUT }}>\n\n            <svg\n          viewBox={`0 0 ${BAR_COUNT * 8} 60`}\n          className=\"w-full h-10 sm:h-12\"\n          preserveAspectRatio=\"none\">\n\n              <defs>\n                <linearGradient id=\"vis-grad\" x1=\"0\" y1=\"1\" x2=\"0\" y2=\"0\">\n                  <stop offset=\"0%\" stopColor=\"#FF4500\" stopOpacity=\"0.6\" />\n                  <stop offset=\"50%\" stopColor=\"#ff6b35\" stopOpacity=\"0.3\" />\n                  <stop offset=\"100%\" stopColor=\"#FF4500\" stopOpacity=\"0.05\" />\n                </linearGradient>\n                <filter id=\"vis-glow\">\n                  <feGaussianBlur stdDeviation=\"1.5\" />\n                  <feMerge>\n                    <feMergeNode />\n                    <feMergeNode in=\"SourceGraphic\" />\n                  </feMerge>\n                </filter>\n              </defs>\n              {bars.map((val, i) => {\n              const barH = Math.max(val * 50, 1);\n              const x = i * 8;\n              const mirror = Math.abs(i - BAR_COUNT / 2) / (BAR_COUNT / 2);\n              const opacity = 0.4 + (1 - mirror) * 0.6;\n              return (\n                <rect\n                key={i}\n                x={x + 1}\n                y={60 - barH}\n                width={5}\n                height={barH}\n                rx={2}\n                fill=\"url(#vis-grad)\"\n                opacity={opacity}\n                filter={val > 0.5 ? 'url(#vis-glow)' : undefined} />);\n\n\n            })}\n              {/* Horizontal glow line at base */}\n              <line\n            x1=\"0\" y1=\"59\" x2={BAR_COUNT * 8} y2=\"59\"\n            stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n\n            </svg>\n          </motion.div>\n        }\n      </AnimatePresence>\n    </>);\n\n}","encoding":"utf8"}
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+import { Volume2, VolumeX } from 'lucide-react';
+
+const BAR_COUNT = 52;
+
+function createSpaceSoundscape(ctx: AudioContext) {
+  const master = ctx.createGain();
+  master.gain.value = 0;
+  master.connect(ctx.destination);
+
+  // Deep sub-bass drone
+  const drone = ctx.createOscillator();
+  drone.type = 'sine';
+  drone.frequency.value = 42;
+  const droneG = ctx.createGain();
+  droneG.gain.value = 0.14;
+  drone.connect(droneG).connect(master);
+  drone.start();
+
+  // LFO on drone
+  const lfo = ctx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.05;
+  const lfoG = ctx.createGain();
+  lfoG.gain.value = 3;
+  lfo.connect(lfoG).connect(drone.frequency);
+  lfo.start();
+
+  // Cosmic hiss (filtered noise)
+  const bufLen = ctx.sampleRate * 4;
+  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) d[i] = (Math.random() * 2 - 1) * 0.5;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  noise.loop = true;
+  const nf = ctx.createBiquadFilter();
+  nf.type = 'lowpass';
+  nf.frequency.value = 220;
+  nf.Q.value = 0.8;
+  const ng = ctx.createGain();
+  ng.gain.value = 0.07;
+  noise.connect(nf).connect(ng).connect(master);
+  noise.start();
+
+  // LFO on noise filter
+  const nfLfo = ctx.createOscillator();
+  nfLfo.type = 'sine';
+  nfLfo.frequency.value = 0.03;
+  const nfLfoG = ctx.createGain();
+  nfLfoG.gain.value = 80;
+  nfLfo.connect(nfLfoG).connect(nf.frequency);
+  nfLfo.start();
+
+  // Ethereal pad (two detuned sines)
+  const pad1 = ctx.createOscillator();
+  pad1.type = 'sine';
+  pad1.frequency.value = 110;
+  const pad2 = ctx.createOscillator();
+  pad2.type = 'sine';
+  pad2.frequency.value = 112.5;
+  const pg = ctx.createGain();
+  pg.gain.value = 0.035;
+  pad1.connect(pg);
+  pad2.connect(pg);
+  pg.connect(master);
+  pad1.start();
+  pad2.start();
+
+  // Pad sweep
+  const pLfo = ctx.createOscillator();
+  pLfo.type = 'triangle';
+  pLfo.frequency.value = 0.02;
+  const pLfoG = ctx.createGain();
+  pLfoG.gain.value = 8;
+  pLfo.connect(pLfoG).connect(pad1.frequency);
+  pLfo.connect(pLfoG).connect(pad2.frequency);
+  pLfo.start();
+
+  // High shimmer
+  const shim = ctx.createOscillator();
+  shim.type = 'sine';
+  shim.frequency.value = 880;
+  const shimG = ctx.createGain();
+  shimG.gain.value = 0.008;
+  shim.connect(shimG).connect(master);
+  shim.start();
+  const shimLfo = ctx.createOscillator();
+  shimLfo.type = 'sine';
+  shimLfo.frequency.value = 0.15;
+  const shimLfoG = ctx.createGain();
+  shimLfoG.gain.value = 0.006;
+  shimLfo.connect(shimLfoG).connect(shimG.gain);
+  shimLfo.start();
+
+  // Analyser for visualizer
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.82;
+  master.connect(analyser);
+
+  return { master, analyser, stop: () => {
+      [drone, lfo, noise, pad1, pad2, nfLfo, pLfo, shim, shimLfo].forEach((n) => {
+        try {n.stop();} catch {}
+      });
+    } };
+}
+
+export default function SpaceAudio() {
+  const [active, setActive] = useState(false);
+  const [showVis, setShowVis] = useState(false);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const soundRef = useRef<ReturnType<typeof createSpaceSoundscape> | null>(null);
+  const frameRef = useRef(0);
+  const barsRef = useRef<number[]>(new Array(BAR_COUNT).fill(0));
+  const [bars, setBars] = useState<number[]>(new Array(BAR_COUNT).fill(0));
+
+  const toggle = useCallback(() => {
+    if (!active) {
+      // Start audio
+      const ctx = new AudioContext();
+      ctxRef.current = ctx;
+      const sound = createSpaceSoundscape(ctx);
+      soundRef.current = sound;
+
+      // Fade in
+      sound.master.gain.setValueAtTime(0, ctx.currentTime);
+      sound.master.gain.linearRampToValueAtTime(0.65, ctx.currentTime + 2);
+
+      setActive(true);
+      setShowVis(true);
+
+      // Visualizer loop
+      const dataArray = new Uint8Array(sound.analyser.frequencyBinCount);
+      const tick = () => {
+        sound.analyser.getByteFrequencyData(dataArray);
+        const step = Math.floor(dataArray.length / BAR_COUNT);
+        const newBars: number[] = [];
+        for (let i = 0; i < BAR_COUNT; i++) {
+          // Average nearby bins
+          let sum = 0;
+          for (let j = 0; j < step; j++) sum += dataArray[i * step + j] || 0;
+          newBars.push(sum / step / 255);
+        }
+        barsRef.current = newBars;
+        setBars([...newBars]);
+        frameRef.current = requestAnimationFrame(tick);
+      };
+      frameRef.current = requestAnimationFrame(tick);
+    } else {
+      // Fade out
+      const ctx = ctxRef.current;
+      const sound = soundRef.current;
+      if (ctx && sound) {
+        sound.master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+        setTimeout(() => {
+          cancelAnimationFrame(frameRef.current);
+          sound.stop();
+          ctx.close();
+          ctxRef.current = null;
+          soundRef.current = null;
+          setShowVis(false);
+          setBars(new Array(BAR_COUNT).fill(0));
+        }, 1600);
+      }
+      setActive(false);
+    }
+  }, [active]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(frameRef.current);
+      soundRef.current?.stop();
+      ctxRef.current?.close();
+    };
+  }, []);
+
+  return (
+    <>
+      {/* Toggle button */}
+      <motion.button
+        onClick={toggle}
+        className={`fixed bottom-5 right-5 lg:bottom-16 lg:right-5 z-50 w-11 h-11 rounded-xl flex items-center justify-center transition-all border ${
+        active ?
+        'bg-primary/15 border-primary/30 text-primary shadow-lg shadow-primary/20' :
+        'bg-white/[0.04] border-white/[0.08] text-white/30 hover:text-white/60 hover:bg-white/[0.08]'}`
+        }
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
+        title={active ? 'Mute Deep Space Audio' : 'Enable Deep Space Audio'}>
+
+        {active ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+        {active &&
+        <motion.div
+          className="absolute inset-0 rounded-xl border border-primary/40"
+          animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0, 0.4] }}
+          transition={{ duration: 2, repeat: Infinity }} />
+
+        }
+      </motion.button>
+
+      {/* Frequency visualizer bar */}
+      <AnimatePresence>
+        {showVis &&
+        <motion.div
+          className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.6, ease: EXPO_OUT }}>
+
+            <svg
+          viewBox={`0 0 ${BAR_COUNT * 8} 60`}
+          className="w-full h-10 sm:h-12"
+          preserveAspectRatio="none">
+
+              <defs>
+                <linearGradient id="vis-grad" x1="0" y1="1" x2="0" y2="0">
+                  <stop offset="0%" stopColor="#FF4500" stopOpacity="0.6" />
+                  <stop offset="50%" stopColor="#ff6b35" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#FF4500" stopOpacity="0.05" />
+                </linearGradient>
+                <filter id="vis-glow">
+                  <feGaussianBlur stdDeviation="1.5" />
+                  <feMerge>
+                    <feMergeNode />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {bars.map((val, i) => {
+              const barH = Math.max(val * 50, 1);
+              const x = i * 8;
+              const mirror = Math.abs(i - BAR_COUNT / 2) / (BAR_COUNT / 2);
+              const opacity = 0.4 + (1 - mirror) * 0.6;
+              return (
+                <rect
+                key={i}
+                x={x + 1}
+                y={60 - barH}
+                width={5}
+                height={barH}
+                rx={2}
+                fill="url(#vis-grad)"
+                opacity={opacity}
+                filter={val > 0.5 ? 'url(#vis-glow)' : undefined} />);
+
+
+            })}
+              {/* Horizontal glow line at base */}
+              <line
+            x1="0" y1="59" x2={BAR_COUNT * 8} y2="59"
+            stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.2" />
+
+            </svg>
+          </motion.div>
+        }
+      </AnimatePresence>
+    </>);
+
+}

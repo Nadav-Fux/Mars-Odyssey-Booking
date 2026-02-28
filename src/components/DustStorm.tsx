@@ -1,1 +1,351 @@
-{"path":"src/components/DustStorm.tsx","content":"import { useState, useEffect, useRef, useCallback, memo } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { Wind } from 'lucide-react';\nimport { EXPO_IN_OUT, EXPO_OUT } from '@/lib/easing';\n\n/**\n * DustStorm\n *\n * A self-contained Martian dust storm that randomly triggers\n * every ~2 minutes. When active it layers:\n *\n *  1. Full-screen animated orange noise grain (SVG feTurbulence)\n *  2. Directional sand-streak particles (canvas)\n *  3. A warm orange colour shift on the viewport\n *  4. A CSS class on <html> that applies \"wind\" sway\n *     to all glassmorphism cards & sections\n *  5. A small HUD warning banner\n *\n * Storm duration: 12-18 s (randomised).\n * Interval between storms: 100-140 s (≈ 2 min, randomised).\n */\n\n// ── Config ──────────────────────────────────────────────\nconst MIN_INTERVAL = 100_000; // ms between storms\nconst MAX_INTERVAL = 140_000;\nconst MIN_DURATION = 12_000; // storm length\nconst MAX_DURATION = 18_000;\nconst FADE_IN = 2500; // ms\nconst FADE_OUT = 3500;\n\nfunction rand(a: number, b: number) {\n  return a + Math.random() * (b - a);\n}\n\n// ── Wind CSS injected once ──────────────────────────────\nconst windCSS = `\n/* === DUST STORM: Wind sway on UI panels === */\n@keyframes dust-sway {\n  0%   { transform: translateX(0)    rotate(0deg);   }\n  15%  { transform: translateX(3px)  rotate(0.15deg); }\n  30%  { transform: translateX(-2px) rotate(-0.1deg); }\n  50%  { transform: translateX(4px)  rotate(0.2deg);  }\n  70%  { transform: translateX(-3px) rotate(-0.15deg);}\n  85%  { transform: translateX(2px)  rotate(0.1deg);  }\n  100% { transform: translateX(0)    rotate(0deg);    }\n}\n\n@keyframes dust-sway-subtle {\n  0%   { transform: translateX(0)    skewX(0deg);    }\n  20%  { transform: translateX(1.5px) skewX(0.08deg); }\n  40%  { transform: translateX(-1px) skewX(-0.05deg);}\n  60%  { transform: translateX(2px)  skewX(0.1deg);  }\n  80%  { transform: translateX(-1.5px) skewX(-0.06deg);}\n  100% { transform: translateX(0)    skewX(0deg);    }\n}\n\n@keyframes dust-streak {\n  0%   { transform: translateX(-120vw) scaleX(1); opacity: 0; }\n  10%  { opacity: 1; }\n  90%  { opacity: 1; }\n  100% { transform: translateX(120vw) scaleX(1.3); opacity: 0; }\n}\n\n@keyframes dust-noise-drift {\n  0%   { transform: translate(0, 0); }\n  50%  { transform: translate(-5%, 2%); }\n  100% { transform: translate(0, 0); }\n}\n\n/* Cards / sections sway when storm is active */\n.dust-storm-active section,\n.dust-storm-active [class*=\"rounded-2xl\"],\n.dust-storm-active [class*=\"rounded-xl\"] {\n  animation: dust-sway 3.2s ease-in-out infinite;\n}\n\n/* Headings and text get a subtler shift */\n.dust-storm-active h1,\n.dust-storm-active h2,\n.dust-storm-active h3,\n.dust-storm-active p,\n.dust-storm-active span {\n  animation: dust-sway-subtle 2.8s ease-in-out infinite;\n}\n\n/* Stagger child delays for organic feel */\n.dust-storm-active section:nth-child(odd)  { animation-delay: 0s;    }\n.dust-storm-active section:nth-child(even) { animation-delay: -0.6s; }\n.dust-storm-active [class*=\"rounded-2xl\"]:nth-child(odd)  { animation-delay: -0.3s; }\n.dust-storm-active [class*=\"rounded-2xl\"]:nth-child(even) { animation-delay: -1.1s; }\n.dust-storm-active [class*=\"rounded-xl\"]:nth-child(3n)    { animation-delay: -0.8s; }\n\n/* Respect reduced motion */\n@media (prefers-reduced-motion: reduce) {\n  .dust-storm-active * {\n    animation: none !important;\n  }\n}\n`;\n\n// ── Sand streak particles ───────────────────────────────\nfunction SandStreaks() {\n  // 12 streaks at random vertical positions\n  const streaks = useRef(\n    Array.from({ length: 14 }, (_, i) => ({\n      id: i,\n      top: rand(2, 95),\n      height: rand(0.5, 2),\n      duration: rand(2.5, 5),\n      delay: rand(0, 4),\n      opacity: rand(0.04, 0.12)\n    }))\n  );\n\n  return (\n    <div className=\"fixed inset-0 pointer-events-none z-[81] overflow-hidden\">\n      {streaks.current.map((s) =>\n      <div\n      key={s.id}\n      className=\"absolute left-0 w-[200vw]\"\n      style={{\n        top: `${s.top}%`,\n        height: `${s.height}px`,\n        background: `linear-gradient(90deg, transparent, rgba(210,120,40,${s.opacity}) 20%, rgba(190,100,30,${s.opacity * 1.3}) 50%, rgba(210,120,40,${s.opacity}) 80%, transparent)`,\n        animation: `dust-streak ${s.duration}s ${s.delay}s linear infinite`\n      }} />\n\n      )}\n    </div>);\n\n}\n\n// ── Main component ──────────────────────────────────────\nfunction DustStorm() {\n  const [active, setActive] = useState(false);\n  const [phase, setPhase] = useState<'idle' | 'fadein' | 'peak' | 'fadeout'>('idle');\n  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();\n\n  // Lifecycle: schedule → fadein → peak → fadeout → idle → schedule…\n  const scheduleStorm = useCallback(() => {\n    const wait = rand(MIN_INTERVAL, MAX_INTERVAL);\n    timeoutRef.current = setTimeout(() => {\n      startStorm();\n    }, wait);\n  }, []);\n\n  const startStorm = useCallback(() => {\n    setActive(true);\n    setPhase('fadein');\n    document.documentElement.classList.add('dust-storm-active');\n\n    // After fade-in → peak\n    timeoutRef.current = setTimeout(() => {\n      setPhase('peak');\n\n      // After peak duration → fadeout\n      const dur = rand(MIN_DURATION, MAX_DURATION);\n      timeoutRef.current = setTimeout(() => {\n        setPhase('fadeout');\n\n        // After fade-out → idle → reschedule\n        timeoutRef.current = setTimeout(() => {\n          setActive(false);\n          setPhase('idle');\n          document.documentElement.classList.remove('dust-storm-active');\n          scheduleStorm();\n        }, FADE_OUT);\n      }, dur);\n    }, FADE_IN);\n  }, [scheduleStorm]);\n\n  // Kick off initial schedule\n  useEffect(() => {\n    scheduleStorm();\n    return () => {\n      clearTimeout(timeoutRef.current);\n      document.documentElement.classList.remove('dust-storm-active');\n    };\n  }, [scheduleStorm]);\n\n  // Compute opacity based on phase\n  const intensity =\n  phase === 'fadein' ? 0.6 :\n  phase === 'peak' ? 1 :\n  phase === 'fadeout' ? 0 : 0;\n\n  const transitionDur =\n  phase === 'fadein' ? FADE_IN / 1000 :\n  phase === 'fadeout' ? FADE_OUT / 1000 : 0.3;\n\n  return (\n    <>\n      {/* Inject wind CSS (always present, only activates with .dust-storm-active) */}\n      <style dangerouslySetInnerHTML={{ __html: windCSS }} />\n\n      <AnimatePresence>\n        {active &&\n        <>\n            {/* ── 1. Orange colour wash ── */}\n            <motion.div\n            key=\"dust-wash\"\n            className=\"fixed inset-0 pointer-events-none z-[80]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: intensity * 0.35 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}\n            style={{\n              background: `\n                  radial-gradient(ellipse 130% 80% at 40% 45%,\n                    rgba(180,80,20,0.25) 0%,\n                    rgba(150,60,10,0.15) 40%,\n                    rgba(120,50,10,0.08) 70%,\n                    transparent 100%\n                  )\n                `,\n              mixBlendMode: 'screen'\n            }} />\n\n\n            {/* ── 2. Orange noise / grain (SVG turbulence) ── */}\n            <motion.div\n            key=\"dust-noise\"\n            className=\"fixed inset-0 pointer-events-none z-[80]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: intensity * 0.55 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}\n            style={{ animation: 'dust-noise-drift 8s ease-in-out infinite' }}>\n\n              <svg width=\"100%\" height=\"100%\" className=\"absolute inset-0\">\n                <defs>\n                  <filter id=\"dust-grain\" x=\"0%\" y=\"0%\" width=\"100%\" height=\"100%\">\n                    <feTurbulence\n                  type=\"fractalNoise\"\n                  baseFrequency=\"0.65\"\n                  numOctaves=\"4\"\n                  stitchTiles=\"stitch\"\n                  result=\"noise\">\n\n                      <animate\n                    attributeName=\"seed\"\n                    values=\"0;50;100;30;80;0\"\n                    dur=\"4s\"\n                    repeatCount=\"indefinite\" />\n\n                    </feTurbulence>\n                    {/* Tint the noise orange */}\n                    <feColorMatrix\n                  in=\"noise\"\n                  type=\"matrix\"\n                  values=\"\n                        0.8 0   0   0 0.15\n                        0.3 0   0   0 0.05\n                        0   0   0   0 0\n                        0   0   0 0.12 0\n                      \"\n\n\n\n\n\n                  result=\"orangeNoise\" />\n\n                    <feBlend in=\"orangeNoise\" in2=\"SourceGraphic\" mode=\"screen\" />\n                  </filter>\n                </defs>\n                <rect\n              width=\"100%\"\n              height=\"100%\"\n              filter=\"url(#dust-grain)\"\n              fill=\"transparent\" />\n\n              </svg>\n            </motion.div>\n\n            {/* ── 3. Sand streaks ── */}\n            <motion.div\n            key=\"dust-streaks\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: intensity }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}>\n\n              <SandStreaks />\n            </motion.div>\n\n            {/* ── 4. Directional gradient (wind direction: left → right) ── */}\n            <motion.div\n            key=\"dust-direction\"\n            className=\"fixed inset-0 pointer-events-none z-[80]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: intensity * 0.2 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}\n            style={{\n              background: 'linear-gradient(90deg, transparent 0%, rgba(200,100,30,0.06) 30%, rgba(180,80,20,0.1) 60%, rgba(160,70,15,0.04) 100%)'\n            }} />\n\n\n            {/* ── 5. HUD warning banner ── */}\n            <motion.div\n            key=\"dust-hud\"\n            className=\"fixed top-14 lg:top-4 left-1/2 -translate-x-1/2 z-[85] pointer-events-none\"\n            initial={{ opacity: 0, y: -16, scale: 0.95 }}\n            animate={{ opacity: 1, y: 0, scale: 1 }}\n            exit={{ opacity: 0, y: -16, scale: 0.95 }}\n            transition={{ duration: 0.6, delay: 0.5, ease: EXPO_OUT }}>\n\n              <div className=\"flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[rgba(60,25,5,0.7)] backdrop-blur-md border border-[rgba(200,100,30,0.25)]\">\n                <motion.div\n                animate={{ rotate: [0, 15, -10, 5, 0] }}\n                transition={{ duration: 1.5, repeat: Infinity }}>\n\n                  <Wind className=\"w-3.5 h-3.5 text-orange-400\" />\n                </motion.div>\n                <span className=\"text-[10px] sm:text-xs font-display tracking-[0.18em] text-orange-300/80\">\n                  DUST STORM DETECTED — VISIBILITY REDUCED\n                </span>\n                <motion.div\n                className=\"w-1.5 h-1.5 rounded-full bg-orange-400\"\n                animate={{ opacity: [1, 0.2, 1] }}\n                transition={{ duration: 0.7, repeat: Infinity }} />\n\n              </div>\n            </motion.div>\n\n            {/* ── 6. Edge darkening / atmosphere haze ── */}\n            <motion.div\n            key=\"dust-vignette\"\n            className=\"fixed inset-0 pointer-events-none z-[79]\"\n            initial={{ opacity: 0 }}\n            animate={{ opacity: intensity * 0.6 }}\n            exit={{ opacity: 0 }}\n            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}\n            style={{\n              background: `\n                  radial-gradient(ellipse at center, transparent 20%,\n                    rgba(80,35,10,0.12) 60%,\n                    rgba(40,15,5,0.25) 100%\n                  )\n                `\n            }} />\n\n          </>\n        }\n      </AnimatePresence>\n    </>);\n\n}\n\nexport default memo(DustStorm);","encoding":"utf8"}
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Wind } from 'lucide-react';
+import { EXPO_IN_OUT, EXPO_OUT } from '@/lib/easing';
+
+/**
+ * DustStorm
+ *
+ * A self-contained Martian dust storm that randomly triggers
+ * every ~2 minutes. When active it layers:
+ *
+ *  1. Full-screen animated orange noise grain (SVG feTurbulence)
+ *  2. Directional sand-streak particles (canvas)
+ *  3. A warm orange colour shift on the viewport
+ *  4. A CSS class on <html> that applies "wind" sway
+ *     to all glassmorphism cards & sections
+ *  5. A small HUD warning banner
+ *
+ * Storm duration: 12-18 s (randomised).
+ * Interval between storms: 100-140 s (≈ 2 min, randomised).
+ */
+
+// ── Config ──────────────────────────────────────────────
+const MIN_INTERVAL = 100_000; // ms between storms
+const MAX_INTERVAL = 140_000;
+const MIN_DURATION = 12_000; // storm length
+const MAX_DURATION = 18_000;
+const FADE_IN = 2500; // ms
+const FADE_OUT = 3500;
+
+function rand(a: number, b: number) {
+  return a + Math.random() * (b - a);
+}
+
+// ── Wind CSS injected once ──────────────────────────────
+const windCSS = `
+/* === DUST STORM: Wind sway on UI panels === */
+@keyframes dust-sway {
+  0%   { transform: translateX(0)    rotate(0deg);   }
+  15%  { transform: translateX(3px)  rotate(0.15deg); }
+  30%  { transform: translateX(-2px) rotate(-0.1deg); }
+  50%  { transform: translateX(4px)  rotate(0.2deg);  }
+  70%  { transform: translateX(-3px) rotate(-0.15deg);}
+  85%  { transform: translateX(2px)  rotate(0.1deg);  }
+  100% { transform: translateX(0)    rotate(0deg);    }
+}
+
+@keyframes dust-sway-subtle {
+  0%   { transform: translateX(0)    skewX(0deg);    }
+  20%  { transform: translateX(1.5px) skewX(0.08deg); }
+  40%  { transform: translateX(-1px) skewX(-0.05deg);}
+  60%  { transform: translateX(2px)  skewX(0.1deg);  }
+  80%  { transform: translateX(-1.5px) skewX(-0.06deg);}
+  100% { transform: translateX(0)    skewX(0deg);    }
+}
+
+@keyframes dust-streak {
+  0%   { transform: translateX(-120vw) scaleX(1); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(120vw) scaleX(1.3); opacity: 0; }
+}
+
+@keyframes dust-noise-drift {
+  0%   { transform: translate(0, 0); }
+  50%  { transform: translate(-5%, 2%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Cards / sections sway when storm is active */
+.dust-storm-active section,
+.dust-storm-active [class*="rounded-2xl"],
+.dust-storm-active [class*="rounded-xl"] {
+  animation: dust-sway 3.2s ease-in-out infinite;
+}
+
+/* Headings and text get a subtler shift */
+.dust-storm-active h1,
+.dust-storm-active h2,
+.dust-storm-active h3,
+.dust-storm-active p,
+.dust-storm-active span {
+  animation: dust-sway-subtle 2.8s ease-in-out infinite;
+}
+
+/* Stagger child delays for organic feel */
+.dust-storm-active section:nth-child(odd)  { animation-delay: 0s;    }
+.dust-storm-active section:nth-child(even) { animation-delay: -0.6s; }
+.dust-storm-active [class*="rounded-2xl"]:nth-child(odd)  { animation-delay: -0.3s; }
+.dust-storm-active [class*="rounded-2xl"]:nth-child(even) { animation-delay: -1.1s; }
+.dust-storm-active [class*="rounded-xl"]:nth-child(3n)    { animation-delay: -0.8s; }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .dust-storm-active * {
+    animation: none !important;
+  }
+}
+`;
+
+// ── Sand streak particles ───────────────────────────────
+function SandStreaks() {
+  // 12 streaks at random vertical positions
+  const streaks = useRef(
+    Array.from({ length: 14 }, (_, i) => ({
+      id: i,
+      top: rand(2, 95),
+      height: rand(0.5, 2),
+      duration: rand(2.5, 5),
+      delay: rand(0, 4),
+      opacity: rand(0.04, 0.12)
+    }))
+  );
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[81] overflow-hidden">
+      {streaks.current.map((s) =>
+      <div
+      key={s.id}
+      className="absolute left-0 w-[200vw]"
+      style={{
+        top: `${s.top}%`,
+        height: `${s.height}px`,
+        background: `linear-gradient(90deg, transparent, rgba(210,120,40,${s.opacity}) 20%, rgba(190,100,30,${s.opacity * 1.3}) 50%, rgba(210,120,40,${s.opacity}) 80%, transparent)`,
+        animation: `dust-streak ${s.duration}s ${s.delay}s linear infinite`
+      }} />
+
+      )}
+    </div>);
+
+}
+
+// ── Main component ──────────────────────────────────────
+function DustStorm() {
+  const [active, setActive] = useState(false);
+  const [phase, setPhase] = useState<'idle' | 'fadein' | 'peak' | 'fadeout'>('idle');
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Lifecycle: schedule → fadein → peak → fadeout → idle → schedule…
+  const scheduleStorm = useCallback(() => {
+    const wait = rand(MIN_INTERVAL, MAX_INTERVAL);
+    timeoutRef.current = setTimeout(() => {
+      startStorm();
+    }, wait);
+  }, []);
+
+  const startStorm = useCallback(() => {
+    setActive(true);
+    setPhase('fadein');
+    document.documentElement.classList.add('dust-storm-active');
+
+    // After fade-in → peak
+    timeoutRef.current = setTimeout(() => {
+      setPhase('peak');
+
+      // After peak duration → fadeout
+      const dur = rand(MIN_DURATION, MAX_DURATION);
+      timeoutRef.current = setTimeout(() => {
+        setPhase('fadeout');
+
+        // After fade-out → idle → reschedule
+        timeoutRef.current = setTimeout(() => {
+          setActive(false);
+          setPhase('idle');
+          document.documentElement.classList.remove('dust-storm-active');
+          scheduleStorm();
+        }, FADE_OUT);
+      }, dur);
+    }, FADE_IN);
+  }, [scheduleStorm]);
+
+  // Kick off initial schedule
+  useEffect(() => {
+    scheduleStorm();
+    return () => {
+      clearTimeout(timeoutRef.current);
+      document.documentElement.classList.remove('dust-storm-active');
+    };
+  }, [scheduleStorm]);
+
+  // Compute opacity based on phase
+  const intensity =
+  phase === 'fadein' ? 0.6 :
+  phase === 'peak' ? 1 :
+  phase === 'fadeout' ? 0 : 0;
+
+  const transitionDur =
+  phase === 'fadein' ? FADE_IN / 1000 :
+  phase === 'fadeout' ? FADE_OUT / 1000 : 0.3;
+
+  return (
+    <>
+      {/* Inject wind CSS (always present, only activates with .dust-storm-active) */}
+      <style dangerouslySetInnerHTML={{ __html: windCSS }} />
+
+      <AnimatePresence>
+        {active &&
+        <>
+            {/* ── 1. Orange colour wash ── */}
+            <motion.div
+            key="dust-wash"
+            className="fixed inset-0 pointer-events-none z-[80]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: intensity * 0.35 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}
+            style={{
+              background: `
+                  radial-gradient(ellipse 130% 80% at 40% 45%,
+                    rgba(180,80,20,0.25) 0%,
+                    rgba(150,60,10,0.15) 40%,
+                    rgba(120,50,10,0.08) 70%,
+                    transparent 100%
+                  )
+                `,
+              mixBlendMode: 'screen'
+            }} />
+
+
+            {/* ── 2. Orange noise / grain (SVG turbulence) ── */}
+            <motion.div
+            key="dust-noise"
+            className="fixed inset-0 pointer-events-none z-[80]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: intensity * 0.55 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}
+            style={{ animation: 'dust-noise-drift 8s ease-in-out infinite' }}>
+
+              <svg width="100%" height="100%" className="absolute inset-0">
+                <defs>
+                  <filter id="dust-grain" x="0%" y="0%" width="100%" height="100%">
+                    <feTurbulence
+                  type="fractalNoise"
+                  baseFrequency="0.65"
+                  numOctaves="4"
+                  stitchTiles="stitch"
+                  result="noise">
+
+                      <animate
+                    attributeName="seed"
+                    values="0;50;100;30;80;0"
+                    dur="4s"
+                    repeatCount="indefinite" />
+
+                    </feTurbulence>
+                    {/* Tint the noise orange */}
+                    <feColorMatrix
+                  in="noise"
+                  type="matrix"
+                  values="
+                        0.8 0   0   0 0.15
+                        0.3 0   0   0 0.05
+                        0   0   0   0 0
+                        0   0   0 0.12 0
+                      "
+
+
+
+
+
+                  result="orangeNoise" />
+
+                    <feBlend in="orangeNoise" in2="SourceGraphic" mode="screen" />
+                  </filter>
+                </defs>
+                <rect
+              width="100%"
+              height="100%"
+              filter="url(#dust-grain)"
+              fill="transparent" />
+
+              </svg>
+            </motion.div>
+
+            {/* ── 3. Sand streaks ── */}
+            <motion.div
+            key="dust-streaks"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: intensity }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}>
+
+              <SandStreaks />
+            </motion.div>
+
+            {/* ── 4. Directional gradient (wind direction: left → right) ── */}
+            <motion.div
+            key="dust-direction"
+            className="fixed inset-0 pointer-events-none z-[80]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: intensity * 0.2 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(200,100,30,0.06) 30%, rgba(180,80,20,0.1) 60%, rgba(160,70,15,0.04) 100%)'
+            }} />
+
+
+            {/* ── 5. HUD warning banner ── */}
+            <motion.div
+            key="dust-hud"
+            className="fixed top-14 lg:top-4 left-1/2 -translate-x-1/2 z-[85] pointer-events-none"
+            initial={{ opacity: 0, y: -16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.95 }}
+            transition={{ duration: 0.6, delay: 0.5, ease: EXPO_OUT }}>
+
+              <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-[rgba(60,25,5,0.7)] backdrop-blur-md border border-[rgba(200,100,30,0.25)]">
+                <motion.div
+                animate={{ rotate: [0, 15, -10, 5, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}>
+
+                  <Wind className="w-3.5 h-3.5 text-orange-400" />
+                </motion.div>
+                <span className="text-[10px] sm:text-xs font-display tracking-[0.18em] text-orange-300/80">
+                  DUST STORM DETECTED — VISIBILITY REDUCED
+                </span>
+                <motion.div
+                className="w-1.5 h-1.5 rounded-full bg-orange-400"
+                animate={{ opacity: [1, 0.2, 1] }}
+                transition={{ duration: 0.7, repeat: Infinity }} />
+
+              </div>
+            </motion.div>
+
+            {/* ── 6. Edge darkening / atmosphere haze ── */}
+            <motion.div
+            key="dust-vignette"
+            className="fixed inset-0 pointer-events-none z-[79]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: intensity * 0.6 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: transitionDur, ease: EXPO_IN_OUT }}
+            style={{
+              background: `
+                  radial-gradient(ellipse at center, transparent 20%,
+                    rgba(80,35,10,0.12) 60%,
+                    rgba(40,15,5,0.25) 100%
+                  )
+                `
+            }} />
+
+          </>
+        }
+      </AnimatePresence>
+    </>);
+
+}
+
+export default memo(DustStorm);

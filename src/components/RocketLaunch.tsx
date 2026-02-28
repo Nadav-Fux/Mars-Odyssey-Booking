@@ -1,1 +1,38 @@
-{"path":"src/components/RocketLaunch.tsx","content":"import { useEffect, useState } from 'react';\nimport Lottie from 'lottie-react';\nimport rocketData from '@/assets/animations/rocket-launch.json';\n\ninterface RocketLaunchProps {\n  play: boolean;\n  onComplete?: () => void;\n}\n\nexport default function RocketLaunch({ play, onComplete }: RocketLaunchProps) {\n  const [show, setShow] = useState(false);\n\n  useEffect(() => {\n    if (play) {\n      setShow(true);\n      const timer = setTimeout(() => {\n        setShow(false);\n        onComplete?.();\n      }, 3200);\n      return () => clearTimeout(timer);\n    }\n  }, [play, onComplete]);\n\n  if (!show) return null;\n\n  return (\n    <div className=\"flex flex-col items-center justify-center\">\n      <div className=\"w-48 h-48 sm:w-56 sm:h-56\">\n        <Lottie\n          animationData={rocketData}\n          loop={false}\n          autoplay={true}\n          className=\"w-full h-full\" />\n\n      </div>\n    </div>);\n\n}","encoding":"utf8"}
+import { useEffect, useState } from 'react';
+import Lottie from 'lottie-react';
+import rocketData from '@/assets/animations/rocket-launch.json';
+
+interface RocketLaunchProps {
+  play: boolean;
+  onComplete?: () => void;
+}
+
+export default function RocketLaunch({ play, onComplete }: RocketLaunchProps) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (play) {
+      setShow(true);
+      const timer = setTimeout(() => {
+        setShow(false);
+        onComplete?.();
+      }, 3200);
+      return () => clearTimeout(timer);
+    }
+  }, [play, onComplete]);
+
+  if (!show) return null;
+
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <div className="w-48 h-48 sm:w-56 sm:h-56">
+        <Lottie
+          animationData={rocketData}
+          loop={false}
+          autoplay={true}
+          className="w-full h-full" />
+
+      </div>
+    </div>);
+
+}

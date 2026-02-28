@@ -1,1 +1,281 @@
-{"path":"src/components/NebulaBackground.tsx","content":"import { memo } from 'react';\n\n/*\n * NebulaBackground — Pure CSS cosmic gas shader\n *\n * Multiple layered radial / conic gradients that pulse, drift and breathe\n * at different rates to simulate deep-space nebulae.\n *\n * Performance:\n *  • Only transform + opacity are animated (GPU-composited, zero layout)\n *  • will-change on animated layers\n *  • Reduced motion: respects prefers-reduced-motion\n */\n\ninterface CloudConfig {\n  id: string;\n  /** CSS gradient value */\n  gradient: string;\n  /** Position & size */\n  top: string;\n  left: string;\n  width: string;\n  height: string;\n  /** Which keyframe set */\n  animation: string;\n  /** Extra rotation offset */\n  rotate?: string;\n  /** Blend mode */\n  blend?: string;\n}\n\nconst clouds: CloudConfig[] = [\n// ---- Large primary nebula (Mars red / deep magenta) ----\n{\n  id: 'nebula-core',\n  gradient: `radial-gradient(\n      ellipse 70% 55% at 45% 50%,\n      rgba(255,69,0,0.07) 0%,\n      rgba(180,30,60,0.05) 25%,\n      rgba(100,10,80,0.03) 50%,\n      transparent 75%\n    )`,\n  top: '5%',\n  left: '15%',\n  width: '70vw',\n  height: '60vh',\n  animation: 'nebula-pulse-1 28s ease-in-out infinite'\n},\n// ---- Teal / cyan wisp (top-right) ----\n{\n  id: 'nebula-teal',\n  gradient: `radial-gradient(\n      ellipse 60% 80% at 60% 40%,\n      rgba(74,184,196,0.04) 0%,\n      rgba(40,100,160,0.025) 35%,\n      transparent 70%\n    )`,\n  top: '-5%',\n  left: '45%',\n  width: '55vw',\n  height: '50vh',\n  animation: 'nebula-pulse-2 34s ease-in-out infinite',\n  rotate: '15deg'\n},\n// ---- Deep purple sheet (mid-left) ----\n{\n  id: 'nebula-purple',\n  gradient: `radial-gradient(\n      ellipse 80% 50% at 30% 55%,\n      rgba(88,28,135,0.05) 0%,\n      rgba(60,20,100,0.03) 40%,\n      transparent 70%\n    )`,\n  top: '30%',\n  left: '-10%',\n  width: '65vw',\n  height: '55vh',\n  animation: 'nebula-pulse-3 38s ease-in-out infinite',\n  rotate: '-8deg'\n},\n// ---- Hot ember glow (center-bottom) ----\n{\n  id: 'nebula-ember',\n  gradient: `radial-gradient(\n      circle at 50% 50%,\n      rgba(255,100,50,0.045) 0%,\n      rgba(200,40,0,0.025) 30%,\n      rgba(120,20,40,0.015) 55%,\n      transparent 75%\n    )`,\n  top: '55%',\n  left: '25%',\n  width: '50vw',\n  height: '50vh',\n  animation: 'nebula-pulse-4 25s ease-in-out infinite'\n},\n// ---- Conic swirl overlay (subtle rotation) ----\n{\n  id: 'nebula-swirl',\n  gradient: `conic-gradient(\n      from 0deg at 50% 50%,\n      transparent 0deg,\n      rgba(255,69,0,0.015) 60deg,\n      transparent 120deg,\n      rgba(74,184,196,0.012) 200deg,\n      transparent 280deg,\n      rgba(88,28,135,0.01) 340deg,\n      transparent 360deg\n    )`,\n  top: '10%',\n  left: '10%',\n  width: '80vw',\n  height: '80vh',\n  animation: 'nebula-rotate 120s linear infinite',\n  blend: 'screen'\n},\n// ---- Faint blue filament (right edge) ----\n{\n  id: 'nebula-filament',\n  gradient: `radial-gradient(\n      ellipse 40% 90% at 80% 50%,\n      rgba(60,120,220,0.03) 0%,\n      rgba(40,60,140,0.015) 45%,\n      transparent 75%\n    )`,\n  top: '15%',\n  left: '50%',\n  width: '50vw',\n  height: '70vh',\n  animation: 'nebula-pulse-2 42s ease-in-out infinite reverse',\n  rotate: '5deg'\n}];\n\n\n// CSS keyframes injected once — only transform + opacity for GPU compositing\nconst keyframesCSS = `\n@keyframes nebula-pulse-1 {\n  0%, 100% {\n    opacity: 0.6;\n    transform: scale(1) translate(0, 0);\n  }\n  25% {\n    opacity: 1;\n    transform: scale(1.08) translate(1.5%, -1%);\n  }\n  50% {\n    opacity: 0.75;\n    transform: scale(1.02) translate(-0.5%, 1.5%);\n  }\n  75% {\n    opacity: 0.95;\n    transform: scale(1.06) translate(-1%, -0.5%);\n  }\n}\n\n@keyframes nebula-pulse-2 {\n  0%, 100% {\n    opacity: 0.5;\n    transform: scale(1) translate(0, 0);\n  }\n  30% {\n    opacity: 0.9;\n    transform: scale(1.12) translate(-2%, 1%);\n  }\n  60% {\n    opacity: 0.65;\n    transform: scale(0.97) translate(1%, -1.5%);\n  }\n  85% {\n    opacity: 0.85;\n    transform: scale(1.05) translate(0.5%, 0.8%);\n  }\n}\n\n@keyframes nebula-pulse-3 {\n  0%, 100% {\n    opacity: 0.55;\n    transform: scale(1) translate(0, 0) rotate(-8deg);\n  }\n  35% {\n    opacity: 0.9;\n    transform: scale(1.1) translate(2%, 1.5%) rotate(-6deg);\n  }\n  65% {\n    opacity: 0.7;\n    transform: scale(1.04) translate(-1.5%, -0.5%) rotate(-10deg);\n  }\n}\n\n@keyframes nebula-pulse-4 {\n  0%, 100% {\n    opacity: 0.5;\n    transform: scale(1) translate(0, 0);\n  }\n  20% {\n    opacity: 0.85;\n    transform: scale(1.07) translate(-1%, 2%);\n  }\n  45% {\n    opacity: 0.6;\n    transform: scale(0.95) translate(1.5%, -1%);\n  }\n  70% {\n    opacity: 1;\n    transform: scale(1.1) translate(-0.5%, 0.5%);\n  }\n}\n\n@keyframes nebula-rotate {\n  from {\n    transform: rotate(0deg) scale(1);\n  }\n  to {\n    transform: rotate(360deg) scale(1);\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  [data-nebula-cloud] {\n    animation: none !important;\n  }\n}\n\n/* Battery saver: freeze animations, reduce blur for GPU savings */\n.battery-saver [data-nebula-cloud] {\n  animation: none !important;\n  filter: blur(20px) !important;\n  opacity: 0.4 !important;\n  will-change: auto !important;\n}\n`;\n\nfunction NebulaBackground() {\n  return (\n    <div\n    className=\"fixed inset-0 pointer-events-none overflow-hidden\"\n    style={{ zIndex: 0 }}\n    aria-hidden=\"true\">\n\n      {/* Inject keyframes */}\n      <style dangerouslySetInnerHTML={{ __html: keyframesCSS }} />\n\n      {clouds.map((c) =>\n      <div\n      key={c.id}\n      data-nebula-cloud\n      style={{\n        position: 'absolute',\n        top: c.top,\n        left: c.left,\n        width: c.width,\n        height: c.height,\n        backgroundImage: c.gradient,\n        animation: c.animation,\n        willChange: 'transform, opacity',\n        transform: c.rotate ? `rotate(${c.rotate})` : undefined,\n        mixBlendMode: c.blend as React.CSSProperties['mixBlendMode'] || 'normal',\n        // Large blur to diffuse the gradients into soft gas clouds\n        filter: 'blur(40px)'\n      }} />\n\n      )}\n\n      {/* Extra large ambient haze — very faint overall tint */}\n      <div\n      style={{\n        position: 'absolute',\n        inset: 0,\n        background: `\n            radial-gradient(ellipse 120% 80% at 30% 40%, rgba(255,69,0,0.012) 0%, transparent 60%),\n            radial-gradient(ellipse 100% 100% at 70% 70%, rgba(88,28,135,0.01) 0%, transparent 50%)\n          `,\n        animation: 'nebula-pulse-1 50s ease-in-out infinite reverse',\n        willChange: 'opacity'\n      }} />\n\n    </div>);\n\n}\n\nexport default memo(NebulaBackground);","encoding":"utf8"}
+import { memo } from 'react';
+
+/*
+ * NebulaBackground — Pure CSS cosmic gas shader
+ *
+ * Multiple layered radial / conic gradients that pulse, drift and breathe
+ * at different rates to simulate deep-space nebulae.
+ *
+ * Performance:
+ *  • Only transform + opacity are animated (GPU-composited, zero layout)
+ *  • will-change on animated layers
+ *  • Reduced motion: respects prefers-reduced-motion
+ */
+
+interface CloudConfig {
+  id: string;
+  /** CSS gradient value */
+  gradient: string;
+  /** Position & size */
+  top: string;
+  left: string;
+  width: string;
+  height: string;
+  /** Which keyframe set */
+  animation: string;
+  /** Extra rotation offset */
+  rotate?: string;
+  /** Blend mode */
+  blend?: string;
+}
+
+const clouds: CloudConfig[] = [
+// ---- Large primary nebula (Mars red / deep magenta) ----
+{
+  id: 'nebula-core',
+  gradient: `radial-gradient(
+      ellipse 70% 55% at 45% 50%,
+      rgba(255,69,0,0.07) 0%,
+      rgba(180,30,60,0.05) 25%,
+      rgba(100,10,80,0.03) 50%,
+      transparent 75%
+    )`,
+  top: '5%',
+  left: '15%',
+  width: '70vw',
+  height: '60vh',
+  animation: 'nebula-pulse-1 28s ease-in-out infinite'
+},
+// ---- Teal / cyan wisp (top-right) ----
+{
+  id: 'nebula-teal',
+  gradient: `radial-gradient(
+      ellipse 60% 80% at 60% 40%,
+      rgba(74,184,196,0.04) 0%,
+      rgba(40,100,160,0.025) 35%,
+      transparent 70%
+    )`,
+  top: '-5%',
+  left: '45%',
+  width: '55vw',
+  height: '50vh',
+  animation: 'nebula-pulse-2 34s ease-in-out infinite',
+  rotate: '15deg'
+},
+// ---- Deep purple sheet (mid-left) ----
+{
+  id: 'nebula-purple',
+  gradient: `radial-gradient(
+      ellipse 80% 50% at 30% 55%,
+      rgba(88,28,135,0.05) 0%,
+      rgba(60,20,100,0.03) 40%,
+      transparent 70%
+    )`,
+  top: '30%',
+  left: '-10%',
+  width: '65vw',
+  height: '55vh',
+  animation: 'nebula-pulse-3 38s ease-in-out infinite',
+  rotate: '-8deg'
+},
+// ---- Hot ember glow (center-bottom) ----
+{
+  id: 'nebula-ember',
+  gradient: `radial-gradient(
+      circle at 50% 50%,
+      rgba(255,100,50,0.045) 0%,
+      rgba(200,40,0,0.025) 30%,
+      rgba(120,20,40,0.015) 55%,
+      transparent 75%
+    )`,
+  top: '55%',
+  left: '25%',
+  width: '50vw',
+  height: '50vh',
+  animation: 'nebula-pulse-4 25s ease-in-out infinite'
+},
+// ---- Conic swirl overlay (subtle rotation) ----
+{
+  id: 'nebula-swirl',
+  gradient: `conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg,
+      rgba(255,69,0,0.015) 60deg,
+      transparent 120deg,
+      rgba(74,184,196,0.012) 200deg,
+      transparent 280deg,
+      rgba(88,28,135,0.01) 340deg,
+      transparent 360deg
+    )`,
+  top: '10%',
+  left: '10%',
+  width: '80vw',
+  height: '80vh',
+  animation: 'nebula-rotate 120s linear infinite',
+  blend: 'screen'
+},
+// ---- Faint blue filament (right edge) ----
+{
+  id: 'nebula-filament',
+  gradient: `radial-gradient(
+      ellipse 40% 90% at 80% 50%,
+      rgba(60,120,220,0.03) 0%,
+      rgba(40,60,140,0.015) 45%,
+      transparent 75%
+    )`,
+  top: '15%',
+  left: '50%',
+  width: '50vw',
+  height: '70vh',
+  animation: 'nebula-pulse-2 42s ease-in-out infinite reverse',
+  rotate: '5deg'
+}];
+
+
+// CSS keyframes injected once — only transform + opacity for GPU compositing
+const keyframesCSS = `
+@keyframes nebula-pulse-1 {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1) translate(0, 0);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.08) translate(1.5%, -1%);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.02) translate(-0.5%, 1.5%);
+  }
+  75% {
+    opacity: 0.95;
+    transform: scale(1.06) translate(-1%, -0.5%);
+  }
+}
+
+@keyframes nebula-pulse-2 {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1) translate(0, 0);
+  }
+  30% {
+    opacity: 0.9;
+    transform: scale(1.12) translate(-2%, 1%);
+  }
+  60% {
+    opacity: 0.65;
+    transform: scale(0.97) translate(1%, -1.5%);
+  }
+  85% {
+    opacity: 0.85;
+    transform: scale(1.05) translate(0.5%, 0.8%);
+  }
+}
+
+@keyframes nebula-pulse-3 {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(1) translate(0, 0) rotate(-8deg);
+  }
+  35% {
+    opacity: 0.9;
+    transform: scale(1.1) translate(2%, 1.5%) rotate(-6deg);
+  }
+  65% {
+    opacity: 0.7;
+    transform: scale(1.04) translate(-1.5%, -0.5%) rotate(-10deg);
+  }
+}
+
+@keyframes nebula-pulse-4 {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1) translate(0, 0);
+  }
+  20% {
+    opacity: 0.85;
+    transform: scale(1.07) translate(-1%, 2%);
+  }
+  45% {
+    opacity: 0.6;
+    transform: scale(0.95) translate(1.5%, -1%);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.1) translate(-0.5%, 0.5%);
+  }
+}
+
+@keyframes nebula-rotate {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+  to {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nebula-cloud] {
+    animation: none !important;
+  }
+}
+
+/* Battery saver: freeze animations, reduce blur for GPU savings */
+.battery-saver [data-nebula-cloud] {
+  animation: none !important;
+  filter: blur(20px) !important;
+  opacity: 0.4 !important;
+  will-change: auto !important;
+}
+`;
+
+function NebulaBackground() {
+  return (
+    <div
+    className="fixed inset-0 pointer-events-none overflow-hidden"
+    style={{ zIndex: 0 }}
+    aria-hidden="true">
+
+      {/* Inject keyframes */}
+      <style dangerouslySetInnerHTML={{ __html: keyframesCSS }} />
+
+      {clouds.map((c) =>
+      <div
+      key={c.id}
+      data-nebula-cloud
+      style={{
+        position: 'absolute',
+        top: c.top,
+        left: c.left,
+        width: c.width,
+        height: c.height,
+        backgroundImage: c.gradient,
+        animation: c.animation,
+        willChange: 'transform, opacity',
+        transform: c.rotate ? `rotate(${c.rotate})` : undefined,
+        mixBlendMode: c.blend as React.CSSProperties['mixBlendMode'] || 'normal',
+        // Large blur to diffuse the gradients into soft gas clouds
+        filter: 'blur(40px)'
+      }} />
+
+      )}
+
+      {/* Extra large ambient haze — very faint overall tint */}
+      <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: `
+            radial-gradient(ellipse 120% 80% at 30% 40%, rgba(255,69,0,0.012) 0%, transparent 60%),
+            radial-gradient(ellipse 100% 100% at 70% 70%, rgba(88,28,135,0.01) 0%, transparent 50%)
+          `,
+        animation: 'nebula-pulse-1 50s ease-in-out infinite reverse',
+        willChange: 'opacity'
+      }} />
+
+    </div>);
+
+}
+
+export default memo(NebulaBackground);

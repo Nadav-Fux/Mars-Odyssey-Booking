@@ -1,1 +1,30 @@
-{"path":"src/components/ScrollProgress.tsx","content":"import { useEffect, useState } from 'react';\nimport { motion, useMotionValue, useSpring } from 'framer-motion';\n\nexport default function ScrollProgress() {\n  const progress = useMotionValue(0);\n  const smoothProgress = useSpring(progress, { stiffness: 100, damping: 30, restDelta: 0.001 });\n\n  useEffect(() => {\n    function onScroll() {\n      const scrollTop = window.scrollY;\n      const docHeight = document.documentElement.scrollHeight - window.innerHeight;\n      if (docHeight > 0) {\n        progress.set(scrollTop / docHeight);\n      }\n    }\n    window.addEventListener('scroll', onScroll, { passive: true });\n    return () => window.removeEventListener('scroll', onScroll);\n  }, [progress]);\n\n  return (\n    <motion.div\n      className=\"fixed top-0 left-0 right-0 h-[2px] z-[100] origin-left\"\n      style={{\n        scaleX: smoothProgress,\n        background: 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 60%, var(--color-primary) 100%)',\n        boxShadow: '0 0 12px rgba(255,69,0,0.4), 0 0 4px rgba(255,69,0,0.6)',\n      }}\n    />\n  );\n}\n","encoding":"utf8"}
+import { useEffect, useState } from 'react';
+import { motion, useMotionValue, useSpring } from 'framer-motion';
+
+export default function ScrollProgress() {
+  const progress = useMotionValue(0);
+  const smoothProgress = useSpring(progress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+
+  useEffect(() => {
+    function onScroll() {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight > 0) {
+        progress.set(scrollTop / docHeight);
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [progress]);
+
+  return (
+    <motion.div
+      className="fixed top-0 left-0 right-0 h-[2px] z-[100] origin-left"
+      style={{
+        scaleX: smoothProgress,
+        background: 'linear-gradient(90deg, var(--color-primary) 0%, var(--color-accent) 60%, var(--color-primary) 100%)',
+        boxShadow: '0 0 12px rgba(255,69,0,0.4), 0 0 4px rgba(255,69,0,0.6)',
+      }}
+    />
+  );
+}

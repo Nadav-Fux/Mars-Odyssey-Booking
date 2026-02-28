@@ -1,1 +1,374 @@
-{"path":"src/components/CustomCursor.tsx","content":"import { useEffect, useRef, useState, useCallback } from 'react';\nimport { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\n\n/**\n * CustomCursor — Tactical HUD Reticle\n *\n * Default:  Crosshair + rotating segmented ring + cardinal ticks + coordinate readout\n * Hover:   Expanding square-bracket [ ] target lock with Mars Red glow\n * Click:   Impact flash + compressed brackets\n */\n\ntype CursorVariant = 'default' | 'hover' | 'click';\n\nconst SPRING = { damping: 28, stiffness: 450, mass: 0.4 };\n\nexport default function CustomCursor() {\n  const [variant, setVariant] = useState<CursorVariant>('default');\n  const [visible, setVisible] = useState(false);\n  const [isTouchDevice, setIsTouchDevice] = useState(false);\n  const [coords, setCoords] = useState({ cx: 0, cy: 0 });\n\n  const cursorX = useMotionValue(-100);\n  const cursorY = useMotionValue(-100);\n  const x = useSpring(cursorX, SPRING);\n  const y = useSpring(cursorY, SPRING);\n  const rafRef = useRef(0);\n\n  const [angle, setAngle] = useState(0);\n  const angleRef = useRef(0);\n  const spinRef = useRef(0);\n\n  useEffect(() => {\n    if (isTouchDevice) return;\n    const tick = () => {\n      angleRef.current = (angleRef.current + 0.15) % 360;\n      setAngle(angleRef.current);\n      spinRef.current = requestAnimationFrame(tick);\n    };\n    spinRef.current = requestAnimationFrame(tick);\n    return () => cancelAnimationFrame(spinRef.current);\n  }, [isTouchDevice]);\n\n  useEffect(() => {\n    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;\n    setIsTouchDevice(isTouch);\n    if (isTouch) return;\n\n    document.documentElement.style.cursor = 'none';\n\n    const onMove = (e: MouseEvent) => {\n      cancelAnimationFrame(rafRef.current);\n      rafRef.current = requestAnimationFrame(() => {\n        cursorX.set(e.clientX);\n        cursorY.set(e.clientY);\n        setCoords({ cx: e.clientX, cy: e.clientY });\n        if (!visible) setVisible(true);\n      });\n    };\n\n    const onEnter = () => setVisible(true);\n    const onLeave = () => setVisible(false);\n    const onDown = () => setVariant('click');\n    const onUp = () => setVariant((v) => v === 'click' ? 'default' : v);\n\n    window.addEventListener('mousemove', onMove, { passive: true });\n    document.addEventListener('mouseenter', onEnter);\n    document.addEventListener('mouseleave', onLeave);\n    document.addEventListener('mousedown', onDown);\n    document.addEventListener('mouseup', onUp);\n\n    const setupTracking = () => {\n      const sel = 'a, button, [role=\"button\"], input, select, textarea, .cursor-hover';\n      const els = document.querySelectorAll(sel);\n      const enter = () => setVariant('hover');\n      const leave = () => setVariant('default');\n      els.forEach((el) => {\n        (el as HTMLElement).style.cursor = 'none';\n        el.addEventListener('mouseenter', enter);\n        el.addEventListener('mouseleave', leave);\n      });\n      return () => {\n        els.forEach((el) => {\n          el.removeEventListener('mouseenter', enter);\n          el.removeEventListener('mouseleave', leave);\n        });\n      };\n    };\n\n    let cleanup = setupTracking();\n    const obs = new MutationObserver(() => {\n      cleanup();\n      cleanup = setupTracking();\n    });\n    obs.observe(document.body, { childList: true, subtree: true });\n\n    return () => {\n      cancelAnimationFrame(rafRef.current);\n      window.removeEventListener('mousemove', onMove);\n      document.removeEventListener('mouseenter', onEnter);\n      document.removeEventListener('mouseleave', onLeave);\n      document.removeEventListener('mousedown', onDown);\n      document.removeEventListener('mouseup', onUp);\n      document.documentElement.style.cursor = '';\n      obs.disconnect();\n      cleanup();\n    };\n  }, [visible, cursorX, cursorY]);\n\n  if (isTouchDevice) return null;\n\n  const sizes: Record<CursorVariant, number> = { default: 44, hover: 60, click: 36 };\n  const sz = sizes[variant];\n  const half = sz / 2;\n\n  // Coordinate label\n  const cxLabel = String(coords.cx).padStart(4, '0');\n  const cyLabel = String(coords.cy).padStart(4, '0');\n\n  return (\n    <motion.div\n      className=\"fixed top-0 left-0 pointer-events-none\"\n      style={{ x, y, zIndex: 9999, mixBlendMode: 'difference' }}\n      animate={{ opacity: visible ? 1 : 0 }}\n      transition={{ opacity: { duration: 0.12 } }}>\n\n      <motion.div\n        className=\"relative\"\n        style={{ marginLeft: -half, marginTop: -half }}\n        animate={{ width: sz, height: sz }}\n        transition={{ type: 'spring', damping: 22, stiffness: 350 }}>\n\n        <svg\n        width={sz}\n        height={sz}\n        viewBox=\"0 0 100 100\"\n        fill=\"none\"\n        className=\"w-full h-full overflow-visible\">\n\n          <AnimatePresence mode=\"wait\">\n            {/* ═══ DEFAULT — Tactical Reticle ═══ */}\n            {variant === 'default' &&\n            <motion.g\n              key=\"default\"\n              initial={{ opacity: 0 }}\n              animate={{ opacity: 1 }}\n              exit={{ opacity: 0 }}\n              transition={{ duration: 0.15 }}>\n\n                {/* Center dot */}\n                <circle cx=\"50\" cy=\"50\" r=\"1.8\" fill=\"white\" />\n\n                {/* Crosshair lines (gap in center) */}\n                <line x1=\"50\" y1=\"16\" x2=\"50\" y2=\"38\" stroke=\"white\" strokeWidth=\"0.8\" strokeOpacity=\"0.6\" strokeLinecap=\"round\" />\n                <line x1=\"50\" y1=\"62\" x2=\"50\" y2=\"84\" stroke=\"white\" strokeWidth=\"0.8\" strokeOpacity=\"0.6\" strokeLinecap=\"round\" />\n                <line x1=\"16\" y1=\"50\" x2=\"38\" y2=\"50\" stroke=\"white\" strokeWidth=\"0.8\" strokeOpacity=\"0.6\" strokeLinecap=\"round\" />\n                <line x1=\"62\" y1=\"50\" x2=\"84\" y2=\"50\" stroke=\"white\" strokeWidth=\"0.8\" strokeOpacity=\"0.6\" strokeLinecap=\"round\" />\n\n                {/* Distance ticks on crosshairs */}\n                {[24, 30].map((d) =>\n              <g key={`tick-d-${d}`}>\n                    <line x1={50 - 2} y1={d} x2={50 + 2} y2={d} stroke=\"white\" strokeWidth=\"0.4\" strokeOpacity=\"0.3\" />\n                    <line x1={50 - 2} y1={100 - d} x2={50 + 2} y2={100 - d} stroke=\"white\" strokeWidth=\"0.4\" strokeOpacity=\"0.3\" />\n                    <line x1={d} y1={50 - 2} x2={d} y2={50 + 2} stroke=\"white\" strokeWidth=\"0.4\" strokeOpacity=\"0.3\" />\n                    <line x1={100 - d} y1={50 - 2} x2={100 - d} y2={50 + 2} stroke=\"white\" strokeWidth=\"0.4\" strokeOpacity=\"0.3\" />\n                  </g>\n              )}\n\n                {/* Inner ring */}\n                <circle cx=\"50\" cy=\"50\" r=\"14\" stroke=\"white\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n\n                {/* Rotating segmented outer ring */}\n                <g transform={`rotate(${angle} 50 50)`}>\n                  {[0, 90, 180, 270].map((a) =>\n                <path\n                key={a}\n                d={describeArc(50, 50, 26, a + 8, a + 72)}\n                stroke=\"white\"\n                strokeWidth=\"0.7\"\n                strokeOpacity=\"0.3\"\n                strokeLinecap=\"round\"\n                fill=\"none\" />\n\n                )}\n                </g>\n\n                {/* Counter-rotating thin ring */}\n                <g transform={`rotate(${-angle * 0.6} 50 50)`}>\n                  {[0, 120, 240].map((a) =>\n                <path\n                key={`inner-${a}`}\n                d={describeArc(50, 50, 20, a + 5, a + 35)}\n                stroke=\"white\"\n                strokeWidth=\"0.3\"\n                strokeOpacity=\"0.15\"\n                fill=\"none\" />\n\n                )}\n                </g>\n\n                {/* Cardinal tick marks */}\n                {[0, 90, 180, 270].map((a) =>\n              <line key={`tick-${a}`} x1=\"50\" y1=\"4\" x2=\"50\" y2=\"10\" stroke=\"white\" strokeWidth=\"0.6\" strokeOpacity=\"0.2\" transform={`rotate(${a} 50 50)`} />\n              )}\n                {[45, 135, 225, 315].map((a) =>\n              <line key={`dtick-${a}`} x1=\"50\" y1=\"7\" x2=\"50\" y2=\"11\" stroke=\"white\" strokeWidth=\"0.3\" strokeOpacity=\"0.1\" transform={`rotate(${a} 50 50)`} />\n              )}\n\n                {/* Coordinate readout */}\n                <text x=\"94\" y=\"96\" fill=\"white\" fillOpacity=\"0.18\" fontSize=\"5\" fontFamily=\"Orbitron, monospace\" textAnchor=\"end\">\n                  {cxLabel},{cyLabel}\n                </text>\n              </motion.g>\n            }\n\n            {/* ═══ HOVER — Square-Bracket Target Lock ═══ */}\n            {variant === 'hover' &&\n            <motion.g\n              key=\"hover\"\n              initial={{ opacity: 0 }}\n              animate={{ opacity: 1 }}\n              exit={{ opacity: 0 }}\n              transition={{ duration: 0.1 }}>\n\n                {/* Glow backdrop */}\n                <motion.circle\n                cx=\"50\" cy=\"50\" r=\"38\"\n                fill=\"none\"\n                stroke=\"#FF4500\"\n                strokeWidth=\"0.4\"\n                initial={{ opacity: 0, scale: 0.7 }}\n                animate={{ opacity: 0.12, scale: 1 }}\n                transition={{ duration: 0.2 }} />\n\n\n                {/* Breathing ring */}\n                <motion.circle\n                cx=\"50\" cy=\"50\" r=\"38\"\n                fill=\"none\" stroke=\"#FF4500\" strokeWidth=\"0.3\"\n                animate={{ r: [38, 42, 38], opacity: [0.08, 0.02, 0.08] }}\n                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} />\n\n\n                {/* Center dot (pulsing) */}\n                <motion.circle\n                cx=\"50\" cy=\"50\" r=\"2.5\" fill=\"#FF4500\"\n                animate={{ r: [2.5, 3.2, 2.5], opacity: [1, 0.6, 1] }}\n                transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }} />\n\n\n                {/* Connecting cross */}\n                <line x1=\"50\" y1=\"34\" x2=\"50\" y2=\"43\" stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n                <line x1=\"50\" y1=\"57\" x2=\"50\" y2=\"66\" stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n                <line x1=\"34\" y1=\"50\" x2=\"43\" y2=\"50\" stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n                <line x1=\"57\" y1=\"50\" x2=\"66\" y2=\"50\" stroke=\"#FF4500\" strokeWidth=\"0.5\" strokeOpacity=\"0.2\" />\n\n                {/* ── SQUARE BRACKETS ── */}\n                {/* Each bracket corner draws in with pathLength animation */}\n                {[\n              { d: 'M32 14 L14 14 L14 32', delay: 0 },\n              { d: 'M68 14 L86 14 L86 32', delay: 0.03 },\n              { d: 'M14 68 L14 86 L32 86', delay: 0.06 },\n              { d: 'M86 68 L86 86 L68 86', delay: 0.09 }].\n              map((b, i) =>\n              <motion.path\n                key={`bracket-${i}`}\n                d={b.d}\n                stroke=\"#FF4500\"\n                strokeWidth=\"2.2\"\n                strokeLinecap=\"round\"\n                strokeLinejoin=\"round\"\n                fill=\"none\"\n                initial={{ pathLength: 0, opacity: 0 }}\n                animate={{ pathLength: 1, opacity: 1 }}\n                transition={{ duration: 0.18, ease: EXPO_OUT, delay: b.delay }} />\n\n              )}\n\n                {/* Corner glow pips */}\n                {[\n              [14, 14], [86, 14], [14, 86], [86, 86]].\n              map(([cx, cy], i) =>\n              <motion.circle\n                key={`pip-${i}`}\n                cx={cx} cy={cy} r=\"1.8\"\n                fill=\"#FF4500\"\n                initial={{ scale: 0 }}\n                animate={{ scale: [1, 1.6, 1], opacity: [0.9, 0.35, 0.9] }}\n                transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.12 }} />\n\n              )}\n\n                {/* Inner bracket edge glow lines */}\n                <line x1=\"14\" y1=\"22\" x2=\"14\" y2=\"28\" stroke=\"#FF4500\" strokeWidth=\"0.6\" strokeOpacity=\"0.15\" />\n                <line x1=\"86\" y1=\"22\" x2=\"86\" y2=\"28\" stroke=\"#FF4500\" strokeWidth=\"0.6\" strokeOpacity=\"0.15\" />\n                <line x1=\"14\" y1=\"72\" x2=\"14\" y2=\"78\" stroke=\"#FF4500\" strokeWidth=\"0.6\" strokeOpacity=\"0.15\" />\n                <line x1=\"86\" y1=\"72\" x2=\"86\" y2=\"78\" stroke=\"#FF4500\" strokeWidth=\"0.6\" strokeOpacity=\"0.15\" />\n\n                {/* LOCK ON label */}\n                <text x=\"50\" y=\"96\" fill=\"#FF4500\" fillOpacity=\"0.3\" fontSize=\"4.5\" fontFamily=\"Orbitron, monospace\" textAnchor=\"middle\" letterSpacing=\"2\">\n                  LOCK\n                </text>\n              </motion.g>\n            }\n\n            {/* ═══ CLICK — Impact Flash ═══ */}\n            {variant === 'click' &&\n            <motion.g\n              key=\"click\"\n              initial={{ opacity: 0 }}\n              animate={{ opacity: 1 }}\n              exit={{ opacity: 0 }}\n              transition={{ duration: 0.08 }}>\n\n                <motion.circle\n                cx=\"50\" cy=\"50\" r=\"28\"\n                stroke=\"white\" strokeWidth=\"2.5\"\n                fill=\"rgba(255,69,0,0.06)\"\n                initial={{ scale: 1.6, opacity: 0 }}\n                animate={{ scale: 1, opacity: 1 }}\n                transition={{ type: 'spring', damping: 18, stiffness: 400 }} />\n\n                <motion.circle\n                cx=\"50\" cy=\"50\" r=\"14\"\n                stroke=\"white\" strokeWidth=\"0.8\" fill=\"none\"\n                initial={{ scale: 0 }}\n                animate={{ scale: 1 }}\n                transition={{ type: 'spring', damping: 20 }} />\n\n                <motion.circle\n                cx=\"50\" cy=\"50\" r=\"3\" fill=\"white\"\n                initial={{ scale: 2.5 }}\n                animate={{ scale: 1 }}\n                transition={{ duration: 0.1 }} />\n\n                {[\n              'M38 38 L30 38 L30 44',\n              'M62 38 L70 38 L70 44',\n              'M30 56 L30 62 L38 62',\n              'M70 56 L70 62 L62 62'].\n              map((d, i) =>\n              <motion.path\n                key={`cb-${i}`}\n                d={d}\n                stroke=\"white\"\n                strokeWidth=\"1.5\"\n                strokeLinecap=\"round\"\n                strokeLinejoin=\"round\"\n                fill=\"none\"\n                initial={{ opacity: 0 }}\n                animate={{ opacity: 0.6 }}\n                transition={{ duration: 0.08, delay: i * 0.02 }} />\n\n              )}\n              </motion.g>\n            }\n          </AnimatePresence>\n        </svg>\n      </motion.div>\n    </motion.div>);\n\n}\n\nfunction polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {\n  const rad = (angleDeg - 90) * Math.PI / 180;\n  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };\n}\n\nfunction describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {\n  const start = polarToCartesian(cx, cy, r, endAngle);\n  const end = polarToCartesian(cx, cy, r, startAngle);\n  const large = endAngle - startAngle <= 180 ? '0' : '1';\n  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y}`;\n}","encoding":"utf8"}
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+
+/**
+ * CustomCursor — Tactical HUD Reticle
+ *
+ * Default:  Crosshair + rotating segmented ring + cardinal ticks + coordinate readout
+ * Hover:   Expanding square-bracket [ ] target lock with Mars Red glow
+ * Click:   Impact flash + compressed brackets
+ */
+
+type CursorVariant = 'default' | 'hover' | 'click';
+
+const SPRING = { damping: 28, stiffness: 450, mass: 0.4 };
+
+export default function CustomCursor() {
+  const [variant, setVariant] = useState<CursorVariant>('default');
+  const [visible, setVisible] = useState(false);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [coords, setCoords] = useState({ cx: 0, cy: 0 });
+
+  const cursorX = useMotionValue(-100);
+  const cursorY = useMotionValue(-100);
+  const x = useSpring(cursorX, SPRING);
+  const y = useSpring(cursorY, SPRING);
+  const rafRef = useRef(0);
+
+  const [angle, setAngle] = useState(0);
+  const angleRef = useRef(0);
+  const spinRef = useRef(0);
+
+  useEffect(() => {
+    if (isTouchDevice) return;
+    const tick = () => {
+      angleRef.current = (angleRef.current + 0.15) % 360;
+      setAngle(angleRef.current);
+      spinRef.current = requestAnimationFrame(tick);
+    };
+    spinRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(spinRef.current);
+  }, [isTouchDevice]);
+
+  useEffect(() => {
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    setIsTouchDevice(isTouch);
+    if (isTouch) return;
+
+    document.documentElement.style.cursor = 'none';
+
+    const onMove = (e: MouseEvent) => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        cursorX.set(e.clientX);
+        cursorY.set(e.clientY);
+        setCoords({ cx: e.clientX, cy: e.clientY });
+        if (!visible) setVisible(true);
+      });
+    };
+
+    const onEnter = () => setVisible(true);
+    const onLeave = () => setVisible(false);
+    const onDown = () => setVariant('click');
+    const onUp = () => setVariant((v) => v === 'click' ? 'default' : v);
+
+    window.addEventListener('mousemove', onMove, { passive: true });
+    document.addEventListener('mouseenter', onEnter);
+    document.addEventListener('mouseleave', onLeave);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('mouseup', onUp);
+
+    const setupTracking = () => {
+      const sel = 'a, button, [role="button"], input, select, textarea, .cursor-hover';
+      const els = document.querySelectorAll(sel);
+      const enter = () => setVariant('hover');
+      const leave = () => setVariant('default');
+      els.forEach((el) => {
+        (el as HTMLElement).style.cursor = 'none';
+        el.addEventListener('mouseenter', enter);
+        el.addEventListener('mouseleave', leave);
+      });
+      return () => {
+        els.forEach((el) => {
+          el.removeEventListener('mouseenter', enter);
+          el.removeEventListener('mouseleave', leave);
+        });
+      };
+    };
+
+    let cleanup = setupTracking();
+    const obs = new MutationObserver(() => {
+      cleanup();
+      cleanup = setupTracking();
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseenter', onEnter);
+      document.removeEventListener('mouseleave', onLeave);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('mouseup', onUp);
+      document.documentElement.style.cursor = '';
+      obs.disconnect();
+      cleanup();
+    };
+  }, [visible, cursorX, cursorY]);
+
+  if (isTouchDevice) return null;
+
+  const sizes: Record<CursorVariant, number> = { default: 44, hover: 60, click: 36 };
+  const sz = sizes[variant];
+  const half = sz / 2;
+
+  // Coordinate label
+  const cxLabel = String(coords.cx).padStart(4, '0');
+  const cyLabel = String(coords.cy).padStart(4, '0');
+
+  return (
+    <motion.div
+      className="fixed top-0 left-0 pointer-events-none"
+      style={{ x, y, zIndex: 9999, mixBlendMode: 'difference' }}
+      animate={{ opacity: visible ? 1 : 0 }}
+      transition={{ opacity: { duration: 0.12 } }}>
+
+      <motion.div
+        className="relative"
+        style={{ marginLeft: -half, marginTop: -half }}
+        animate={{ width: sz, height: sz }}
+        transition={{ type: 'spring', damping: 22, stiffness: 350 }}>
+
+        <svg
+        width={sz}
+        height={sz}
+        viewBox="0 0 100 100"
+        fill="none"
+        className="w-full h-full overflow-visible">
+
+          <AnimatePresence mode="wait">
+            {/* ═══ DEFAULT — Tactical Reticle ═══ */}
+            {variant === 'default' &&
+            <motion.g
+              key="default"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}>
+
+                {/* Center dot */}
+                <circle cx="50" cy="50" r="1.8" fill="white" />
+
+                {/* Crosshair lines (gap in center) */}
+                <line x1="50" y1="16" x2="50" y2="38" stroke="white" strokeWidth="0.8" strokeOpacity="0.6" strokeLinecap="round" />
+                <line x1="50" y1="62" x2="50" y2="84" stroke="white" strokeWidth="0.8" strokeOpacity="0.6" strokeLinecap="round" />
+                <line x1="16" y1="50" x2="38" y2="50" stroke="white" strokeWidth="0.8" strokeOpacity="0.6" strokeLinecap="round" />
+                <line x1="62" y1="50" x2="84" y2="50" stroke="white" strokeWidth="0.8" strokeOpacity="0.6" strokeLinecap="round" />
+
+                {/* Distance ticks on crosshairs */}
+                {[24, 30].map((d) =>
+              <g key={`tick-d-${d}`}>
+                    <line x1={50 - 2} y1={d} x2={50 + 2} y2={d} stroke="white" strokeWidth="0.4" strokeOpacity="0.3" />
+                    <line x1={50 - 2} y1={100 - d} x2={50 + 2} y2={100 - d} stroke="white" strokeWidth="0.4" strokeOpacity="0.3" />
+                    <line x1={d} y1={50 - 2} x2={d} y2={50 + 2} stroke="white" strokeWidth="0.4" strokeOpacity="0.3" />
+                    <line x1={100 - d} y1={50 - 2} x2={100 - d} y2={50 + 2} stroke="white" strokeWidth="0.4" strokeOpacity="0.3" />
+                  </g>
+              )}
+
+                {/* Inner ring */}
+                <circle cx="50" cy="50" r="14" stroke="white" strokeWidth="0.5" strokeOpacity="0.2" />
+
+                {/* Rotating segmented outer ring */}
+                <g transform={`rotate(${angle} 50 50)`}>
+                  {[0, 90, 180, 270].map((a) =>
+                <path
+                key={a}
+                d={describeArc(50, 50, 26, a + 8, a + 72)}
+                stroke="white"
+                strokeWidth="0.7"
+                strokeOpacity="0.3"
+                strokeLinecap="round"
+                fill="none" />
+
+                )}
+                </g>
+
+                {/* Counter-rotating thin ring */}
+                <g transform={`rotate(${-angle * 0.6} 50 50)`}>
+                  {[0, 120, 240].map((a) =>
+                <path
+                key={`inner-${a}`}
+                d={describeArc(50, 50, 20, a + 5, a + 35)}
+                stroke="white"
+                strokeWidth="0.3"
+                strokeOpacity="0.15"
+                fill="none" />
+
+                )}
+                </g>
+
+                {/* Cardinal tick marks */}
+                {[0, 90, 180, 270].map((a) =>
+              <line key={`tick-${a}`} x1="50" y1="4" x2="50" y2="10" stroke="white" strokeWidth="0.6" strokeOpacity="0.2" transform={`rotate(${a} 50 50)`} />
+              )}
+                {[45, 135, 225, 315].map((a) =>
+              <line key={`dtick-${a}`} x1="50" y1="7" x2="50" y2="11" stroke="white" strokeWidth="0.3" strokeOpacity="0.1" transform={`rotate(${a} 50 50)`} />
+              )}
+
+                {/* Coordinate readout */}
+                <text x="94" y="96" fill="white" fillOpacity="0.18" fontSize="5" fontFamily="Orbitron, monospace" textAnchor="end">
+                  {cxLabel},{cyLabel}
+                </text>
+              </motion.g>
+            }
+
+            {/* ═══ HOVER — Square-Bracket Target Lock ═══ */}
+            {variant === 'hover' &&
+            <motion.g
+              key="hover"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.1 }}>
+
+                {/* Glow backdrop */}
+                <motion.circle
+                cx="50" cy="50" r="38"
+                fill="none"
+                stroke="#FF4500"
+                strokeWidth="0.4"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 0.12, scale: 1 }}
+                transition={{ duration: 0.2 }} />
+
+
+                {/* Breathing ring */}
+                <motion.circle
+                cx="50" cy="50" r="38"
+                fill="none" stroke="#FF4500" strokeWidth="0.3"
+                animate={{ r: [38, 42, 38], opacity: [0.08, 0.02, 0.08] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} />
+
+
+                {/* Center dot (pulsing) */}
+                <motion.circle
+                cx="50" cy="50" r="2.5" fill="#FF4500"
+                animate={{ r: [2.5, 3.2, 2.5], opacity: [1, 0.6, 1] }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }} />
+
+
+                {/* Connecting cross */}
+                <line x1="50" y1="34" x2="50" y2="43" stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.2" />
+                <line x1="50" y1="57" x2="50" y2="66" stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.2" />
+                <line x1="34" y1="50" x2="43" y2="50" stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.2" />
+                <line x1="57" y1="50" x2="66" y2="50" stroke="#FF4500" strokeWidth="0.5" strokeOpacity="0.2" />
+
+                {/* ── SQUARE BRACKETS ── */}
+                {/* Each bracket corner draws in with pathLength animation */}
+                {[
+              { d: 'M32 14 L14 14 L14 32', delay: 0 },
+              { d: 'M68 14 L86 14 L86 32', delay: 0.03 },
+              { d: 'M14 68 L14 86 L32 86', delay: 0.06 },
+              { d: 'M86 68 L86 86 L68 86', delay: 0.09 }].
+              map((b, i) =>
+              <motion.path
+                key={`bracket-${i}`}
+                d={b.d}
+                stroke="#FF4500"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.18, ease: EXPO_OUT, delay: b.delay }} />
+
+              )}
+
+                {/* Corner glow pips */}
+                {[
+              [14, 14], [86, 14], [14, 86], [86, 86]].
+              map(([cx, cy], i) =>
+              <motion.circle
+                key={`pip-${i}`}
+                cx={cx} cy={cy} r="1.8"
+                fill="#FF4500"
+                initial={{ scale: 0 }}
+                animate={{ scale: [1, 1.6, 1], opacity: [0.9, 0.35, 0.9] }}
+                transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.12 }} />
+
+              )}
+
+                {/* Inner bracket edge glow lines */}
+                <line x1="14" y1="22" x2="14" y2="28" stroke="#FF4500" strokeWidth="0.6" strokeOpacity="0.15" />
+                <line x1="86" y1="22" x2="86" y2="28" stroke="#FF4500" strokeWidth="0.6" strokeOpacity="0.15" />
+                <line x1="14" y1="72" x2="14" y2="78" stroke="#FF4500" strokeWidth="0.6" strokeOpacity="0.15" />
+                <line x1="86" y1="72" x2="86" y2="78" stroke="#FF4500" strokeWidth="0.6" strokeOpacity="0.15" />
+
+                {/* LOCK ON label */}
+                <text x="50" y="96" fill="#FF4500" fillOpacity="0.3" fontSize="4.5" fontFamily="Orbitron, monospace" textAnchor="middle" letterSpacing="2">
+                  LOCK
+                </text>
+              </motion.g>
+            }
+
+            {/* ═══ CLICK — Impact Flash ═══ */}
+            {variant === 'click' &&
+            <motion.g
+              key="click"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.08 }}>
+
+                <motion.circle
+                cx="50" cy="50" r="28"
+                stroke="white" strokeWidth="2.5"
+                fill="rgba(255,69,0,0.06)"
+                initial={{ scale: 1.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', damping: 18, stiffness: 400 }} />
+
+                <motion.circle
+                cx="50" cy="50" r="14"
+                stroke="white" strokeWidth="0.8" fill="none"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', damping: 20 }} />
+
+                <motion.circle
+                cx="50" cy="50" r="3" fill="white"
+                initial={{ scale: 2.5 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.1 }} />
+
+                {[
+              'M38 38 L30 38 L30 44',
+              'M62 38 L70 38 L70 44',
+              'M30 56 L30 62 L38 62',
+              'M70 56 L70 62 L62 62'].
+              map((d, i) =>
+              <motion.path
+                key={`cb-${i}`}
+                d={d}
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                transition={{ duration: 0.08, delay: i * 0.02 }} />
+
+              )}
+              </motion.g>
+            }
+          </AnimatePresence>
+        </svg>
+      </motion.div>
+    </motion.div>);
+
+}
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
+  const start = polarToCartesian(cx, cy, r, endAngle);
+  const end = polarToCartesian(cx, cy, r, startAngle);
+  const large = endAngle - startAngle <= 180 ? '0' : '1';
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y}`;
+}

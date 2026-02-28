@@ -1,1 +1,230 @@
-{"path":"src/components/DiscoveryMode.tsx","content":"import { useEffect, useState, useRef } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { ChevronLeft, ChevronRight, X, Sparkles, Cpu, Palette, MousePointer, Gauge, Accessibility } from 'lucide-react';\nimport { useDiscoveryMode, CONCEPTS, type DiscoveryConcept } from '@/hooks/useDiscoveryMode';\nimport { EXPO_OUT } from '@/lib/easing';\n\nconst CATEGORY_CONFIG: Record<DiscoveryConcept['category'], {icon: typeof Cpu;color: string;label: string;}> = {\n  animation: { icon: Sparkles, color: 'text-purple-400', label: 'Animation' },\n  design: { icon: Palette, color: 'text-pink-400', label: 'Design' },\n  interaction: { icon: MousePointer, color: 'text-primary', label: 'Interaction' },\n  performance: { icon: Gauge, color: 'text-emerald-400', label: 'Performance' },\n  accessibility: { icon: Accessibility, color: 'text-sky-400', label: 'Accessibility' }\n};\n\nexport default function DiscoveryMode() {\n  const { isActive, activeIndex, next, prev, toggle, totalConcepts, setActiveIndex } = useDiscoveryMode();\n  const [rect, setRect] = useState<DOMRect | null>(null);\n  const rafRef = useRef(0);\n\n  // Track the highlighted element's position\n  useEffect(() => {\n    if (!isActive || activeIndex < 0) {\n      setRect(null);\n      return;\n    }\n\n    const concept = CONCEPTS[activeIndex];\n    const el = document.querySelector(concept.selector);\n\n    if (!el) {\n      setRect(null);\n      return;\n    }\n\n    // Scroll into view\n    el.scrollIntoView({ behavior: 'smooth', block: 'center' });\n\n    const updateRect = () => {\n      const r = el.getBoundingClientRect();\n      setRect(r);\n      rafRef.current = requestAnimationFrame(updateRect);\n    };\n\n    // Small delay for scroll to settle\n    const timeout = setTimeout(() => {\n      updateRect();\n    }, 600);\n\n    return () => {\n      clearTimeout(timeout);\n      cancelAnimationFrame(rafRef.current);\n    };\n  }, [isActive, activeIndex]);\n\n  // Keyboard navigation\n  useEffect(() => {\n    if (!isActive) return;\n    const handler = (e: KeyboardEvent) => {\n      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {\n        e.preventDefault();\n        next();\n      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {\n        e.preventDefault();\n        prev();\n      } else if (e.key === 'Escape') {\n        toggle();\n      }\n    };\n    window.addEventListener('keydown', handler);\n    return () => window.removeEventListener('keydown', handler);\n  }, [isActive, next, prev, toggle]);\n\n  const concept = activeIndex >= 0 ? CONCEPTS[activeIndex] : null;\n  const catConfig = concept ? CATEGORY_CONFIG[concept.category] : null;\n  const CatIcon = catConfig?.icon ?? Cpu;\n\n  return (\n    <AnimatePresence>\n      {isActive &&\n      <>\n          {/* Dim overlay */}\n          <motion.div\n          key=\"discovery-dim\"\n          initial={{ opacity: 0 }}\n          animate={{ opacity: 1 }}\n          exit={{ opacity: 0 }}\n          transition={{ duration: 0.4, ease: EXPO_OUT }}\n          className=\"fixed inset-0 z-[300] bg-black/60 pointer-events-none\"\n          aria-hidden />\n\n\n          {/* Highlight ring around target element */}\n          {rect &&\n        <motion.div\n          key=\"discovery-ring\"\n          initial={{ opacity: 0, scale: 1.1 }}\n          animate={{ opacity: 1, scale: 1 }}\n          exit={{ opacity: 0, scale: 0.95 }}\n          transition={{ duration: 0.5, ease: EXPO_OUT }}\n          className=\"fixed z-[301] pointer-events-none rounded-xl border-2 border-primary/60\"\n          style={{\n            top: rect.top - 12,\n            left: rect.left - 12,\n            width: rect.width + 24,\n            height: rect.height + 24,\n            boxShadow: '0 0 40px rgba(255,69,0,0.15), inset 0 0 40px rgba(255,69,0,0.05)'\n          }}>\n\n              {/* Pulsing corners */}\n              {['-top-1 -left-1', '-top-1 -right-1', '-bottom-1 -left-1', '-bottom-1 -right-1'].map((pos) =>\n          <motion.div\n            key={pos}\n            className={`absolute ${pos} w-3 h-3 border-2 border-primary rounded-sm`}\n            animate={{ scale: [1, 1.3, 1], opacity: [0.8, 1, 0.8] }}\n            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} />\n\n          )}\n            </motion.div>\n        }\n\n          {/* Info panel */}\n          <motion.div\n          key=\"discovery-panel\"\n          initial={{ opacity: 0, y: 30, scale: 0.96 }}\n          animate={{ opacity: 1, y: 0, scale: 1 }}\n          exit={{ opacity: 0, y: 20, scale: 0.96 }}\n          transition={{ duration: 0.5, ease: EXPO_OUT }}\n          className=\"fixed bottom-8 left-1/2 -translate-x-1/2 z-[302] w-[90vw] max-w-lg\"\n          role=\"dialog\"\n          aria-label=\"Discovery Mode\"\n          aria-live=\"polite\">\n\n            <div className=\"relative bg-secondary/95 backdrop-blur-xl border border-white/[0.1] rounded-2xl p-5 shadow-2xl\">\n              {/* Close button */}\n              <button\n            onClick={toggle}\n            className=\"absolute top-3 right-3 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition-colors\"\n            aria-label=\"Close Discovery Mode\">\n\n                <X className=\"w-4 h-4\" />\n              </button>\n\n              {concept && catConfig &&\n            <>\n                  {/* Category badge */}\n                  <div className=\"flex items-center gap-2 mb-3\">\n                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] ${catConfig.color}`}>\n                      <CatIcon className=\"w-3 h-3\" />\n                      <span className=\"text-[10px] font-display tracking-[0.15em] uppercase\">\n                        {catConfig.label}\n                      </span>\n                    </div>\n                    <span className=\"text-[10px] text-white/50 font-display\">\n                      {activeIndex + 1} / {totalConcepts}\n                    </span>\n                  </div>\n\n                  {/* Title */}\n                  <AnimatePresence mode=\"wait\">\n                    <motion.h3\n                  key={`title-${activeIndex}`}\n                  initial={{ opacity: 0, x: 15 }}\n                  animate={{ opacity: 1, x: 0 }}\n                  exit={{ opacity: 0, x: -15 }}\n                  transition={{ duration: 0.3, ease: EXPO_OUT }}\n                  className=\"font-display text-lg font-bold text-white mb-2 tracking-wide\">\n\n                      {concept.title}\n                    </motion.h3>\n                  </AnimatePresence>\n\n                  {/* Description */}\n                  <AnimatePresence mode=\"wait\">\n                    <motion.p\n                  key={`desc-${activeIndex}`}\n                  initial={{ opacity: 0, y: 8 }}\n                  animate={{ opacity: 1, y: 0 }}\n                  exit={{ opacity: 0, y: -8 }}\n                  transition={{ duration: 0.35, ease: EXPO_OUT, delay: 0.05 }}\n                  className=\"text-sm text-white/45 leading-relaxed\">\n\n                      {concept.description}\n                    </motion.p>\n                  </AnimatePresence>\n\n                  {/* Navigation */}\n                  <div className=\"flex items-center justify-between mt-4 pt-3 border-t border-white/[0.06]\">\n                    <button\n                onClick={prev}\n                className=\"flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition-colors text-xs font-display tracking-wider\"\n                aria-label=\"Previous concept\">\n\n                      <ChevronLeft className=\"w-3.5 h-3.5\" />\n                      PREV\n                    </button>\n\n                    {/* Progress dots */}\n                    <div className=\"flex gap-1.5\">\n                      {CONCEPTS.map((_, i) =>\n                  <button\n                  key={i}\n                  onClick={() => setActiveIndex(i)}\n                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${\n                  i === activeIndex ?\n                  'bg-primary w-4' :\n                  'bg-white/30 hover:bg-white/30'}`\n                  }\n                  aria-label={`Go to concept ${i + 1}`} />\n\n                  )}\n                    </div>\n\n                    <button\n                onClick={next}\n                className=\"flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition-colors text-xs font-display tracking-wider\"\n                aria-label=\"Next concept\">\n\n                      NEXT\n                      <ChevronRight className=\"w-3.5 h-3.5\" />\n                    </button>\n                  </div>\n                </>\n            }\n            </div>\n          </motion.div>\n        </>\n      }\n    </AnimatePresence>);\n\n}","encoding":"utf8"}
+import { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight, X, Sparkles, Cpu, Palette, MousePointer, Gauge, Accessibility } from 'lucide-react';
+import { useDiscoveryMode, CONCEPTS, type DiscoveryConcept } from '@/hooks/useDiscoveryMode';
+import { EXPO_OUT } from '@/lib/easing';
+
+const CATEGORY_CONFIG: Record<DiscoveryConcept['category'], {icon: typeof Cpu;color: string;label: string;}> = {
+  animation: { icon: Sparkles, color: 'text-purple-400', label: 'Animation' },
+  design: { icon: Palette, color: 'text-pink-400', label: 'Design' },
+  interaction: { icon: MousePointer, color: 'text-primary', label: 'Interaction' },
+  performance: { icon: Gauge, color: 'text-emerald-400', label: 'Performance' },
+  accessibility: { icon: Accessibility, color: 'text-sky-400', label: 'Accessibility' }
+};
+
+export default function DiscoveryMode() {
+  const { isActive, activeIndex, next, prev, toggle, totalConcepts, setActiveIndex } = useDiscoveryMode();
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const rafRef = useRef(0);
+
+  // Track the highlighted element's position
+  useEffect(() => {
+    if (!isActive || activeIndex < 0) {
+      setRect(null);
+      return;
+    }
+
+    const concept = CONCEPTS[activeIndex];
+    const el = document.querySelector(concept.selector);
+
+    if (!el) {
+      setRect(null);
+      return;
+    }
+
+    // Scroll into view
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const updateRect = () => {
+      const r = el.getBoundingClientRect();
+      setRect(r);
+      rafRef.current = requestAnimationFrame(updateRect);
+    };
+
+    // Small delay for scroll to settle
+    const timeout = setTimeout(() => {
+      updateRect();
+    }, 600);
+
+    return () => {
+      clearTimeout(timeout);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [isActive, activeIndex]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isActive) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        next();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        prev();
+      } else if (e.key === 'Escape') {
+        toggle();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isActive, next, prev, toggle]);
+
+  const concept = activeIndex >= 0 ? CONCEPTS[activeIndex] : null;
+  const catConfig = concept ? CATEGORY_CONFIG[concept.category] : null;
+  const CatIcon = catConfig?.icon ?? Cpu;
+
+  return (
+    <AnimatePresence>
+      {isActive &&
+      <>
+          {/* Dim overlay */}
+          <motion.div
+          key="discovery-dim"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: EXPO_OUT }}
+          className="fixed inset-0 z-[300] bg-black/60 pointer-events-none"
+          aria-hidden />
+
+
+          {/* Highlight ring around target element */}
+          {rect &&
+        <motion.div
+          key="discovery-ring"
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.5, ease: EXPO_OUT }}
+          className="fixed z-[301] pointer-events-none rounded-xl border-2 border-primary/60"
+          style={{
+            top: rect.top - 12,
+            left: rect.left - 12,
+            width: rect.width + 24,
+            height: rect.height + 24,
+            boxShadow: '0 0 40px rgba(255,69,0,0.15), inset 0 0 40px rgba(255,69,0,0.05)'
+          }}>
+
+              {/* Pulsing corners */}
+              {['-top-1 -left-1', '-top-1 -right-1', '-bottom-1 -left-1', '-bottom-1 -right-1'].map((pos) =>
+          <motion.div
+            key={pos}
+            className={`absolute ${pos} w-3 h-3 border-2 border-primary rounded-sm`}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.8, 1, 0.8] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} />
+
+          )}
+            </motion.div>
+        }
+
+          {/* Info panel */}
+          <motion.div
+          key="discovery-panel"
+          initial={{ opacity: 0, y: 30, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.96 }}
+          transition={{ duration: 0.5, ease: EXPO_OUT }}
+          className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[302] w-[90vw] max-w-lg"
+          role="dialog"
+          aria-label="Discovery Mode"
+          aria-live="polite">
+
+            <div className="relative bg-secondary/95 backdrop-blur-xl border border-white/[0.1] rounded-2xl p-5 shadow-2xl">
+              {/* Close button */}
+              <button
+            onClick={toggle}
+            className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition-colors"
+            aria-label="Close Discovery Mode">
+
+                <X className="w-4 h-4" />
+              </button>
+
+              {concept && catConfig &&
+            <>
+                  {/* Category badge */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] ${catConfig.color}`}>
+                      <CatIcon className="w-3 h-3" />
+                      <span className="text-[10px] font-display tracking-[0.15em] uppercase">
+                        {catConfig.label}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-white/50 font-display">
+                      {activeIndex + 1} / {totalConcepts}
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <AnimatePresence mode="wait">
+                    <motion.h3
+                  key={`title-${activeIndex}`}
+                  initial={{ opacity: 0, x: 15 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -15 }}
+                  transition={{ duration: 0.3, ease: EXPO_OUT }}
+                  className="font-display text-lg font-bold text-white mb-2 tracking-wide">
+
+                      {concept.title}
+                    </motion.h3>
+                  </AnimatePresence>
+
+                  {/* Description */}
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                  key={`desc-${activeIndex}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.35, ease: EXPO_OUT, delay: 0.05 }}
+                  className="text-sm text-white/45 leading-relaxed">
+
+                      {concept.description}
+                    </motion.p>
+                  </AnimatePresence>
+
+                  {/* Navigation */}
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/[0.06]">
+                    <button
+                onClick={prev}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition-colors text-xs font-display tracking-wider"
+                aria-label="Previous concept">
+
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      PREV
+                    </button>
+
+                    {/* Progress dots */}
+                    <div className="flex gap-1.5">
+                      {CONCEPTS.map((_, i) =>
+                  <button
+                  key={i}
+                  onClick={() => setActiveIndex(i)}
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                  i === activeIndex ?
+                  'bg-primary w-4' :
+                  'bg-white/30 hover:bg-white/30'}`
+                  }
+                  aria-label={`Go to concept ${i + 1}`} />
+
+                  )}
+                    </div>
+
+                    <button
+                onClick={next}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition-colors text-xs font-display tracking-wider"
+                aria-label="Next concept">
+
+                      NEXT
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </>
+            }
+            </div>
+          </motion.div>
+        </>
+      }
+    </AnimatePresence>);
+
+}

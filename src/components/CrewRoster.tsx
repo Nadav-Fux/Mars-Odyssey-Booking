@@ -1,1 +1,492 @@
-{"path":"src/components/CrewRoster.tsx","content":"import { useRef, useState, useCallback, memo } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { EXPO_OUT, EXPO_IN_OUT } from '@/lib/easing';\nimport { useGSAP } from '@gsap/react';\nimport { gsap } from '@/lib/gsap';\nimport Lottie from 'lottie-react';\nimport { Users, Shield, Heart, Activity, Brain, Radiation } from 'lucide-react';\nimport RevealText from '@/components/RevealText';\nimport { biometricScanData } from '@/lib/biometric-lottie';\nimport CrewBioOverlay from '@/components/CrewBioOverlay';\n\n/* ================================================================\n   CREW ROSTER\n\n   Six crew cards. On hover each card triggers:\n     1. Lottie biometric-scan rings over the avatar\n     2. An SVG ECG waveform that draws via GSAP strokeDashoffset\n     3. Vital-sign counters that tick up from zero\n     4. A horizontal scan-line sweep across the card\n   ================================================================ */\n\n// ── Data ──\ninterface CrewMember {\n  id: string;\n  rank: string;\n  name: string;\n  role: string;\n  specialization: string;\n  status: 'NOMINAL' | 'ACTIVE' | 'ELEVATED';\n  vitals: {hr: number;o2: number;neural: number;};\n  color: string;\n  initials: string;\n}\n\nconst CREW: CrewMember[] = [\n{\n  id: 'vasquez',\n  rank: 'CDR',\n  name: 'KIRA VASQUEZ',\n  role: 'Mission Commander',\n  specialization: 'Orbital Mechanics · EVA Lead',\n  status: 'NOMINAL',\n  vitals: { hr: 68, o2: 99, neural: 97 },\n  color: '#FF4500',\n  initials: 'KV'\n},\n{\n  id: 'chen',\n  rank: 'PLT',\n  name: 'MARCUS CHEN',\n  role: 'Chief Pilot',\n  specialization: 'Atmospheric Entry · VTOL',\n  status: 'ACTIVE',\n  vitals: { hr: 74, o2: 98, neural: 95 },\n  color: '#4ab8c4',\n  initials: 'MC'\n},\n{\n  id: 'okafor',\n  rank: 'MSE',\n  name: 'DR. AISHA OKAFOR',\n  role: 'Flight Surgeon',\n  specialization: 'Trauma Medicine · Radiology',\n  status: 'NOMINAL',\n  vitals: { hr: 62, o2: 99, neural: 98 },\n  color: '#a855f7',\n  initials: 'AO'\n},\n{\n  id: 'reyes',\n  rank: 'ENG',\n  name: 'TOM\\u00c1S REYES',\n  role: 'Flight Engineer',\n  specialization: 'NTP Propulsion · Power Grid',\n  status: 'ACTIVE',\n  vitals: { hr: 71, o2: 97, neural: 93 },\n  color: '#ff6b35',\n  initials: 'TR'\n},\n{\n  id: 'tanaka',\n  rank: 'SCI',\n  name: 'DR. YUKI TANAKA',\n  role: 'Science Officer',\n  specialization: 'Astrobiology · Spectroscopy',\n  status: 'NOMINAL',\n  vitals: { hr: 65, o2: 99, neural: 96 },\n  color: '#eab308',\n  initials: 'YT'\n},\n{\n  id: 'volkov',\n  rank: 'NAV',\n  name: 'ALEXEI VOLKOV',\n  role: 'Navigation Officer',\n  specialization: 'Quantum Nav · Orbital Plots',\n  status: 'NOMINAL',\n  vitals: { hr: 70, o2: 98, neural: 94 },\n  color: '#6b8aed',\n  initials: 'AV'\n}];\n\n\n// ── ECG waveform path (single heartbeat, viewBox 0 0 220 50) ──\nconst ECG_PATH =\n'M0,25 L25,25 L35,23 L40,20 L45,23 L50,25 L60,25 L64,22 ' +\n'L70,7 L76,43 L82,17 L88,25 L100,25 L106,22 L112,18 L118,22 ' +\n'L124,25 L145,25 L155,23 L160,20 L165,23 L170,25 L180,25 ' +\n'L184,22 L190,7 L196,43 L202,17 L208,25 L220,25';\n\nconst STATUS_COLOR: Record<string, string> = {\n  NOMINAL: '#22c55e',\n  ACTIVE: '#4ab8c4',\n  ELEVATED: '#eab308'\n};\n\n// ── Single crew card ──\nfunction CrewCard({ member, onSelect }: {member: CrewMember;onSelect: (id: string) => void;}) {\n  const cardRef = useRef<HTMLDivElement>(null);\n  const ecgRef = useRef<SVGPathElement>(null);\n  const lottieRef = useRef<any>(null);\n  const [hovered, setHovered] = useState(false);\n\n  // Prepare ECG stroke on mount\n  useGSAP(() => {\n    const ecg = ecgRef.current;\n    if (!ecg) return;\n    const len = ecg.getTotalLength();\n    ecg.style.strokeDasharray = `${len}`;\n    ecg.style.strokeDashoffset = `${len}`;\n  }, { scope: cardRef });\n\n  const handleEnter = useCallback(() => {\n    setHovered(true);\n    // Play Lottie scan from start\n    lottieRef.current?.goToAndPlay(0, true);\n    // Draw ECG waveform\n    const ecg = ecgRef.current;\n    if (ecg) {\n      const len = ecg.getTotalLength();\n      gsap.fromTo(ecg,\n      { strokeDashoffset: len },\n      { strokeDashoffset: 0, duration: 1.4, ease: 'expo.inOut' }\n      );\n    }\n  }, []);\n\n  const handleLeave = useCallback(() => {\n    setHovered(false);\n    lottieRef.current?.goToAndStop(0, true);\n    // Reset ECG\n    const ecg = ecgRef.current;\n    if (ecg) {\n      gsap.to(ecg, {\n        strokeDashoffset: ecg.getTotalLength(),\n        duration: 0.4,\n        ease: 'expo.in'\n      });\n    }\n  }, []);\n\n  return (\n    <motion.div\n      ref={cardRef}\n      className=\"group relative rounded-2xl overflow-hidden cursor-pointer\"\n      onMouseEnter={handleEnter}\n      onMouseLeave={handleLeave}\n      onClick={() => onSelect(member.id)}\n      whileHover={{ y: -4 }}\n      transition={{ type: 'spring', stiffness: 300, damping: 25 }}>\n\n      {/* Glass background */}\n      <div\n      className=\"absolute inset-0 rounded-2xl backdrop-blur-md lg:backdrop-blur-2xl transition-all duration-500\"\n      style={{\n        background: hovered ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)',\n        border: `1px solid ${hovered ? `${member.color}30` : 'rgba(255,255,255,0.05)'}`\n      }} />\n\n\n      {/* Top accent line */}\n      <div\n      className=\"absolute top-0 inset-x-0 h-px transition-opacity duration-500\"\n      style={{\n        background: `linear-gradient(90deg, transparent, ${member.color}40, transparent)`,\n        opacity: hovered ? 1 : 0.3\n      }} />\n\n\n      {/* Scan line sweep on hover */}\n      <AnimatePresence>\n        {hovered &&\n        <motion.div\n          className=\"absolute inset-y-0 w-px z-20 pointer-events-none\"\n          style={{ background: `linear-gradient(180deg, transparent, ${member.color}60, transparent)` }}\n          initial={{ left: 0, opacity: 0 }}\n          animate={{ left: '100%', opacity: [0, 1, 1, 0] }}\n          exit={{ opacity: 0 }}\n          transition={{ duration: 0.8, ease: EXPO_IN_OUT }} />\n\n        }\n      </AnimatePresence>\n\n      <div className=\"relative p-5 sm:p-6\">\n        {/* Top row: Avatar + info */}\n        <div className=\"flex items-start gap-4 mb-4\">\n          {/* Avatar with Lottie overlay */}\n          <div className=\"relative flex-shrink-0\" style={{ width: 56, height: 56 }}>\n            {/* Base circle */}\n            <div\n            className=\"w-full h-full rounded-full flex items-center justify-center transition-all duration-500\"\n            style={{\n              background: `${member.color}${hovered ? '18' : '0a'}`,\n              border: `1.5px solid ${member.color}${hovered ? '50' : '20'}`,\n              boxShadow: hovered ? `0 0 20px ${member.color}20` : 'none'\n            }}>\n\n              <span\n              className=\"font-display text-sm font-bold tracking-wider transition-colors duration-300\"\n              style={{ color: hovered ? member.color : `${member.color}80` }}>\n\n                {member.initials}\n              </span>\n            </div>\n\n            {/* Lottie scan rings — overlaid on avatar */}\n            <div className=\"absolute inset-[-40%] pointer-events-none z-10\">\n              <Lottie\n                lottieRef={lottieRef}\n                animationData={biometricScanData}\n                loop={false}\n                autoplay={false}\n                style={{ width: '100%', height: '100%', opacity: hovered ? 1 : 0, transition: 'opacity 0.3s' }} />\n\n            </div>\n          </div>\n\n          {/* Name, role, status */}\n          <div className=\"flex-1 min-w-0\">\n            <div className=\"flex items-center gap-2 mb-0.5\">\n              <span className=\"text-[8px] font-display tracking-[0.2em] text-white/50\">{member.rank}</span>\n              <span\n              className=\"text-[7px] font-display tracking-[0.15em] px-1.5 py-0.5 rounded-full\"\n              style={{\n                color: STATUS_COLOR[member.status],\n                background: `${STATUS_COLOR[member.status]}12`,\n                border: `1px solid ${STATUS_COLOR[member.status]}20`\n              }}>\n\n                ● {member.status}\n              </span>\n            </div>\n            <h3\n            className=\"font-display text-sm sm:text-base font-bold text-white truncate leading-tight mb-1 transition-colors duration-300\"\n            style={{ color: hovered ? member.color : 'white' }}>\n\n              {member.name}\n            </h3>\n            <p className=\"text-white/30 text-xs leading-tight\">{member.role}</p>\n            <p className=\"text-white/50 text-[10px] mt-0.5\">{member.specialization}</p>\n          </div>\n        </div>\n\n        {/* ECG waveform */}\n        <div\n        className=\"relative h-10 rounded-lg overflow-hidden mb-3 transition-all duration-500\"\n        style={{\n          background: hovered ? `${member.color}06` : 'rgba(255,255,255,0.015)',\n          border: `1px solid ${hovered ? `${member.color}15` : 'rgba(255,255,255,0.03)'}`\n        }}>\n\n          {/* Grid lines */}\n          <div\n          className=\"absolute inset-0 opacity-[0.04]\"\n          style={{\n            backgroundImage:\n            'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',\n            backgroundSize: '10px 10px'\n          }} />\n\n\n          <svg viewBox=\"0 0 220 50\" className=\"w-full h-full\" preserveAspectRatio=\"none\">\n            {/* Glow layer */}\n            <path\n            d={ECG_PATH}\n            fill=\"none\"\n            stroke={member.color}\n            strokeWidth=\"3\"\n            strokeOpacity=\"0.15\"\n            style={{ filter: 'blur(2px)' }} />\n\n            {/* Main animated line */}\n            <path\n            ref={ecgRef}\n            d={ECG_PATH}\n            fill=\"none\"\n            stroke={member.color}\n            strokeWidth=\"1.5\"\n            strokeLinecap=\"round\"\n            strokeLinejoin=\"round\"\n            style={{ willChange: 'stroke-dashoffset' }} />\n\n          </svg>\n\n          {/* \"SCANNING\" label */}\n          <AnimatePresence>\n            {hovered &&\n            <motion.span\n              className=\"absolute top-1 right-2 text-[7px] font-display tracking-[0.15em]\"\n              style={{ color: `${member.color}60` }}\n              initial={{ opacity: 0 }}\n              animate={{ opacity: [0.4, 1, 0.4] }}\n              exit={{ opacity: 0 }}\n              transition={{ duration: 1.2, repeat: Infinity, ease: EXPO_IN_OUT }}>\n\n                BIOMETRIC SCAN\n              </motion.span>\n            }\n          </AnimatePresence>\n        </div>\n\n        {/* Vital stats row */}\n        <div className=\"grid grid-cols-3 gap-2\">\n          {[\n          { label: 'HR', value: member.vitals.hr, unit: 'bpm', icon: Heart },\n          { label: 'SpO\\u2082', value: member.vitals.o2, unit: '%', icon: Activity },\n          { label: 'NEURAL', value: member.vitals.neural, unit: '%', icon: Brain }].\n          map((stat) => {\n            const Icon = stat.icon;\n            return (\n              <div\n              key={stat.label}\n              className=\"flex items-center gap-1.5 transition-opacity duration-500\"\n              style={{ opacity: hovered ? 1 : 0.35 }}>\n\n                <Icon className=\"w-3 h-3 flex-shrink-0\" style={{ color: `${member.color}80` }} />\n                <div>\n                  <div className=\"text-[7px] font-display tracking-[0.12em] text-white/50\">{stat.label}</div>\n                  <div className=\"text-xs font-display font-bold text-white tabular-nums\">\n                    <AnimatedValue target={stat.value} active={hovered} />\n                    <span className=\"text-[8px] text-white/50 ml-0.5\">{stat.unit}</span>\n                  </div>\n                </div>\n              </div>);\n\n          })}\n        </div>\n\n        {/* Click hint */}\n        <div\n        className=\"mt-3 pt-3 flex items-center justify-center gap-1.5 transition-opacity duration-300\"\n        style={{\n          borderTop: `1px solid ${hovered ? `${member.color}15` : 'rgba(255,255,255,0.03)'}`,\n          opacity: hovered ? 0.8 : 0.25\n        }}>\n\n          <span\n          className=\"text-[8px] font-display tracking-[0.15em]\"\n          style={{ color: hovered ? member.color : 'rgba(255,255,255,0.3)' }}>\n\n            {hovered ? '▸ VIEW FULL DOSSIER' : 'TAP FOR BIO'}\n          </span>\n        </div>\n      </div>\n    </motion.div>);\n\n}\n\n// ── Animated counter that ticks from 0 → target on hover ──\nfunction AnimatedValue({ target, active }: {target: number;active: boolean;}) {\n  const ref = useRef<HTMLSpanElement>(null);\n  const tweenRef = useRef<gsap.core.Tween | null>(null);\n  const objRef = useRef({ val: 0 });\n\n  useGSAP(() => {\n    if (active) {\n      objRef.current.val = 0;\n      tweenRef.current?.kill();\n      tweenRef.current = gsap.to(objRef.current, {\n        val: target,\n        duration: 1,\n        ease: 'expo.out',\n        onUpdate: () => {\n          if (ref.current) ref.current.textContent = String(Math.round(objRef.current.val));\n        }\n      });\n    } else {\n      tweenRef.current?.kill();\n      objRef.current.val = 0;\n      if (ref.current) ref.current.textContent = '--';\n    }\n  }, [active, target]);\n\n  return <span ref={ref}>--</span>;\n}\n\n// ── Stagger container animation ──\nconst gridStagger = {\n  hidden: {},\n  show: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } }\n};\nconst cardAnim = {\n  hidden: { opacity: 0, y: 40, scale: 0.96, filter: 'blur(6px)' },\n  show: {\n    opacity: 1,\n    y: 0,\n    scale: 1,\n    filter: 'blur(0px)',\n    transition: { duration: 0.7, ease: EXPO_OUT }\n  }\n};\n\n// ── Section ──\nfunction CrewRoster() {\n  const sectionRef = useRef<HTMLDivElement>(null);\n  const [selectedCrew, setSelectedCrew] = useState<string | null>(null);\n\n  useGSAP(() => {\n    gsap.from('.crew-head', {\n      y: 40,\n      opacity: 0,\n      stagger: 0.1,\n      duration: 0.8,\n      scrollTrigger: { trigger: '.crew-header', start: 'top 85%', once: true }\n    });\n  }, { scope: sectionRef });\n\n  return (\n    <section\n    id=\"crew\"\n    ref={sectionRef}\n    className=\"relative z-10 py-20 sm:py-28 px-4 sm:px-6\">\n\n      <div className=\"max-w-6xl mx-auto lg:pl-10\">\n        {/* Header */}\n        <div className=\"crew-header mb-12 sm:mb-16\">\n          <span className=\"crew-head inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/15 bg-primary/[0.04] mb-4\">\n            <Users className=\"w-3 h-3 text-primary\" />\n            <span className=\"text-[10px] font-display tracking-[0.2em] text-primary/70\">CREW MANIFEST</span>\n          </span>\n\n          <h2 className=\"crew-head font-display text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] mb-4\">\n            CREW\n            <br />\n            <span className=\"text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent\">ROSTER</span>\n          </h2>\n\n          <RevealText\n            text=\"Hover to initiate biometric verification. All crew vitals monitored in real-time via the Ares-7 medical telemetry network.\"\n            className=\"crew-head text-white/30 text-sm sm:text-base max-w-lg leading-relaxed\" />\n\n        </div>\n\n        {/* Divider */}\n        <div className=\"flex items-center gap-3 mb-8\">\n          <div className=\"h-px flex-1 bg-gradient-to-r from-white/[0.06] to-transparent\" />\n          <Shield className=\"w-3.5 h-3.5 text-white/10\" />\n          <span className=\"text-[9px] font-display tracking-[0.25em] text-white/50\">CLEARANCE LEVEL ALPHA</span>\n          <div className=\"h-px flex-1 bg-gradient-to-l from-white/[0.06] to-transparent\" />\n        </div>\n\n        {/* Grid */}\n        <motion.div\n          className=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5\"\n          variants={gridStagger}\n          initial=\"hidden\"\n          whileInView=\"show\"\n          viewport={{ once: true, margin: '-60px' }}>\n\n          {CREW.map((member) =>\n          <motion.div key={member.id} variants={cardAnim}>\n              <CrewCard member={member} onSelect={setSelectedCrew} />\n            </motion.div>\n          )}\n        </motion.div>\n\n        {/* Footer note */}\n        <div className=\"mt-8 flex items-center justify-center gap-2\">\n          <Radiation className=\"w-3 h-3 text-white/10\" />\n          <span className=\"text-[8px] font-display tracking-[0.15em] text-white/10\">\n            ALL BIOMETRIC DATA ENCRYPTED · HIPAA-MARS COMPLIANT · SOL 247\n          </span>\n        </div>\n      </div>\n\n      {/* Bio overlay */}\n      <CrewBioOverlay crewId={selectedCrew} onClose={() => setSelectedCrew(null)} />\n    </section>);\n\n}\n\nexport default memo(CrewRoster);","encoding":"utf8"}
+import { useRef, useState, useCallback, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EXPO_OUT, EXPO_IN_OUT } from '@/lib/easing';
+import { useGSAP } from '@gsap/react';
+import { gsap } from '@/lib/gsap';
+import Lottie from 'lottie-react';
+import { Users, Shield, Heart, Activity, Brain, Radiation } from 'lucide-react';
+import RevealText from '@/components/RevealText';
+import { biometricScanData } from '@/lib/biometric-lottie';
+import CrewBioOverlay from '@/components/CrewBioOverlay';
+
+/* ================================================================
+   CREW ROSTER
+
+   Six crew cards. On hover each card triggers:
+     1. Lottie biometric-scan rings over the avatar
+     2. An SVG ECG waveform that draws via GSAP strokeDashoffset
+     3. Vital-sign counters that tick up from zero
+     4. A horizontal scan-line sweep across the card
+   ================================================================ */
+
+// ── Data ──
+interface CrewMember {
+  id: string;
+  rank: string;
+  name: string;
+  role: string;
+  specialization: string;
+  status: 'NOMINAL' | 'ACTIVE' | 'ELEVATED';
+  vitals: {hr: number;o2: number;neural: number;};
+  color: string;
+  initials: string;
+}
+
+const CREW: CrewMember[] = [
+{
+  id: 'vasquez',
+  rank: 'CDR',
+  name: 'KIRA VASQUEZ',
+  role: 'Mission Commander',
+  specialization: 'Orbital Mechanics · EVA Lead',
+  status: 'NOMINAL',
+  vitals: { hr: 68, o2: 99, neural: 97 },
+  color: '#FF4500',
+  initials: 'KV'
+},
+{
+  id: 'chen',
+  rank: 'PLT',
+  name: 'MARCUS CHEN',
+  role: 'Chief Pilot',
+  specialization: 'Atmospheric Entry · VTOL',
+  status: 'ACTIVE',
+  vitals: { hr: 74, o2: 98, neural: 95 },
+  color: '#4ab8c4',
+  initials: 'MC'
+},
+{
+  id: 'okafor',
+  rank: 'MSE',
+  name: 'DR. AISHA OKAFOR',
+  role: 'Flight Surgeon',
+  specialization: 'Trauma Medicine · Radiology',
+  status: 'NOMINAL',
+  vitals: { hr: 62, o2: 99, neural: 98 },
+  color: '#a855f7',
+  initials: 'AO'
+},
+{
+  id: 'reyes',
+  rank: 'ENG',
+  name: 'TOM\u00c1S REYES',
+  role: 'Flight Engineer',
+  specialization: 'NTP Propulsion · Power Grid',
+  status: 'ACTIVE',
+  vitals: { hr: 71, o2: 97, neural: 93 },
+  color: '#ff6b35',
+  initials: 'TR'
+},
+{
+  id: 'tanaka',
+  rank: 'SCI',
+  name: 'DR. YUKI TANAKA',
+  role: 'Science Officer',
+  specialization: 'Astrobiology · Spectroscopy',
+  status: 'NOMINAL',
+  vitals: { hr: 65, o2: 99, neural: 96 },
+  color: '#eab308',
+  initials: 'YT'
+},
+{
+  id: 'volkov',
+  rank: 'NAV',
+  name: 'ALEXEI VOLKOV',
+  role: 'Navigation Officer',
+  specialization: 'Quantum Nav · Orbital Plots',
+  status: 'NOMINAL',
+  vitals: { hr: 70, o2: 98, neural: 94 },
+  color: '#6b8aed',
+  initials: 'AV'
+}];
+
+
+// ── ECG waveform path (single heartbeat, viewBox 0 0 220 50) ──
+const ECG_PATH =
+'M0,25 L25,25 L35,23 L40,20 L45,23 L50,25 L60,25 L64,22 ' +
+'L70,7 L76,43 L82,17 L88,25 L100,25 L106,22 L112,18 L118,22 ' +
+'L124,25 L145,25 L155,23 L160,20 L165,23 L170,25 L180,25 ' +
+'L184,22 L190,7 L196,43 L202,17 L208,25 L220,25';
+
+const STATUS_COLOR: Record<string, string> = {
+  NOMINAL: '#22c55e',
+  ACTIVE: '#4ab8c4',
+  ELEVATED: '#eab308'
+};
+
+// ── Single crew card ──
+function CrewCard({ member, onSelect }: {member: CrewMember;onSelect: (id: string) => void;}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const ecgRef = useRef<SVGPathElement>(null);
+  const lottieRef = useRef<any>(null);
+  const [hovered, setHovered] = useState(false);
+
+  // Prepare ECG stroke on mount
+  useGSAP(() => {
+    const ecg = ecgRef.current;
+    if (!ecg) return;
+    const len = ecg.getTotalLength();
+    ecg.style.strokeDasharray = `${len}`;
+    ecg.style.strokeDashoffset = `${len}`;
+  }, { scope: cardRef });
+
+  const handleEnter = useCallback(() => {
+    setHovered(true);
+    // Play Lottie scan from start
+    lottieRef.current?.goToAndPlay(0, true);
+    // Draw ECG waveform
+    const ecg = ecgRef.current;
+    if (ecg) {
+      const len = ecg.getTotalLength();
+      gsap.fromTo(ecg,
+      { strokeDashoffset: len },
+      { strokeDashoffset: 0, duration: 1.4, ease: 'expo.inOut' }
+      );
+    }
+  }, []);
+
+  const handleLeave = useCallback(() => {
+    setHovered(false);
+    lottieRef.current?.goToAndStop(0, true);
+    // Reset ECG
+    const ecg = ecgRef.current;
+    if (ecg) {
+      gsap.to(ecg, {
+        strokeDashoffset: ecg.getTotalLength(),
+        duration: 0.4,
+        ease: 'expo.in'
+      });
+    }
+  }, []);
+
+  return (
+    <motion.div
+      ref={cardRef}
+      className="group relative rounded-2xl overflow-hidden cursor-pointer"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onClick={() => onSelect(member.id)}
+      whileHover={{ y: -4 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}>
+
+      {/* Glass background */}
+      <div
+      className="absolute inset-0 rounded-2xl backdrop-blur-md lg:backdrop-blur-2xl transition-all duration-500"
+      style={{
+        background: hovered ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)',
+        border: `1px solid ${hovered ? `${member.color}30` : 'rgba(255,255,255,0.05)'}`
+      }} />
+
+
+      {/* Top accent line */}
+      <div
+      className="absolute top-0 inset-x-0 h-px transition-opacity duration-500"
+      style={{
+        background: `linear-gradient(90deg, transparent, ${member.color}40, transparent)`,
+        opacity: hovered ? 1 : 0.3
+      }} />
+
+
+      {/* Scan line sweep on hover */}
+      <AnimatePresence>
+        {hovered &&
+        <motion.div
+          className="absolute inset-y-0 w-px z-20 pointer-events-none"
+          style={{ background: `linear-gradient(180deg, transparent, ${member.color}60, transparent)` }}
+          initial={{ left: 0, opacity: 0 }}
+          animate={{ left: '100%', opacity: [0, 1, 1, 0] }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8, ease: EXPO_IN_OUT }} />
+
+        }
+      </AnimatePresence>
+
+      <div className="relative p-5 sm:p-6">
+        {/* Top row: Avatar + info */}
+        <div className="flex items-start gap-4 mb-4">
+          {/* Avatar with Lottie overlay */}
+          <div className="relative flex-shrink-0" style={{ width: 56, height: 56 }}>
+            {/* Base circle */}
+            <div
+            className="w-full h-full rounded-full flex items-center justify-center transition-all duration-500"
+            style={{
+              background: `${member.color}${hovered ? '18' : '0a'}`,
+              border: `1.5px solid ${member.color}${hovered ? '50' : '20'}`,
+              boxShadow: hovered ? `0 0 20px ${member.color}20` : 'none'
+            }}>
+
+              <span
+              className="font-display text-sm font-bold tracking-wider transition-colors duration-300"
+              style={{ color: hovered ? member.color : `${member.color}80` }}>
+
+                {member.initials}
+              </span>
+            </div>
+
+            {/* Lottie scan rings — overlaid on avatar */}
+            <div className="absolute inset-[-40%] pointer-events-none z-10">
+              <Lottie
+                lottieRef={lottieRef}
+                animationData={biometricScanData}
+                loop={false}
+                autoplay={false}
+                style={{ width: '100%', height: '100%', opacity: hovered ? 1 : 0, transition: 'opacity 0.3s' }} />
+
+            </div>
+          </div>
+
+          {/* Name, role, status */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[8px] font-display tracking-[0.2em] text-white/50">{member.rank}</span>
+              <span
+              className="text-[7px] font-display tracking-[0.15em] px-1.5 py-0.5 rounded-full"
+              style={{
+                color: STATUS_COLOR[member.status],
+                background: `${STATUS_COLOR[member.status]}12`,
+                border: `1px solid ${STATUS_COLOR[member.status]}20`
+              }}>
+
+                ● {member.status}
+              </span>
+            </div>
+            <h3
+            className="font-display text-sm sm:text-base font-bold text-white truncate leading-tight mb-1 transition-colors duration-300"
+            style={{ color: hovered ? member.color : 'white' }}>
+
+              {member.name}
+            </h3>
+            <p className="text-white/30 text-xs leading-tight">{member.role}</p>
+            <p className="text-white/50 text-[10px] mt-0.5">{member.specialization}</p>
+          </div>
+        </div>
+
+        {/* ECG waveform */}
+        <div
+        className="relative h-10 rounded-lg overflow-hidden mb-3 transition-all duration-500"
+        style={{
+          background: hovered ? `${member.color}06` : 'rgba(255,255,255,0.015)',
+          border: `1px solid ${hovered ? `${member.color}15` : 'rgba(255,255,255,0.03)'}`
+        }}>
+
+          {/* Grid lines */}
+          <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',
+            backgroundSize: '10px 10px'
+          }} />
+
+
+          <svg viewBox="0 0 220 50" className="w-full h-full" preserveAspectRatio="none">
+            {/* Glow layer */}
+            <path
+            d={ECG_PATH}
+            fill="none"
+            stroke={member.color}
+            strokeWidth="3"
+            strokeOpacity="0.15"
+            style={{ filter: 'blur(2px)' }} />
+
+            {/* Main animated line */}
+            <path
+            ref={ecgRef}
+            d={ECG_PATH}
+            fill="none"
+            stroke={member.color}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ willChange: 'stroke-dashoffset' }} />
+
+          </svg>
+
+          {/* "SCANNING" label */}
+          <AnimatePresence>
+            {hovered &&
+            <motion.span
+              className="absolute top-1 right-2 text-[7px] font-display tracking-[0.15em]"
+              style={{ color: `${member.color}60` }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: EXPO_IN_OUT }}>
+
+                BIOMETRIC SCAN
+              </motion.span>
+            }
+          </AnimatePresence>
+        </div>
+
+        {/* Vital stats row */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+          { label: 'HR', value: member.vitals.hr, unit: 'bpm', icon: Heart },
+          { label: 'SpO\u2082', value: member.vitals.o2, unit: '%', icon: Activity },
+          { label: 'NEURAL', value: member.vitals.neural, unit: '%', icon: Brain }].
+          map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div
+              key={stat.label}
+              className="flex items-center gap-1.5 transition-opacity duration-500"
+              style={{ opacity: hovered ? 1 : 0.35 }}>
+
+                <Icon className="w-3 h-3 flex-shrink-0" style={{ color: `${member.color}80` }} />
+                <div>
+                  <div className="text-[7px] font-display tracking-[0.12em] text-white/50">{stat.label}</div>
+                  <div className="text-xs font-display font-bold text-white tabular-nums">
+                    <AnimatedValue target={stat.value} active={hovered} />
+                    <span className="text-[8px] text-white/50 ml-0.5">{stat.unit}</span>
+                  </div>
+                </div>
+              </div>);
+
+          })}
+        </div>
+
+        {/* Click hint */}
+        <div
+        className="mt-3 pt-3 flex items-center justify-center gap-1.5 transition-opacity duration-300"
+        style={{
+          borderTop: `1px solid ${hovered ? `${member.color}15` : 'rgba(255,255,255,0.03)'}`,
+          opacity: hovered ? 0.8 : 0.25
+        }}>
+
+          <span
+          className="text-[8px] font-display tracking-[0.15em]"
+          style={{ color: hovered ? member.color : 'rgba(255,255,255,0.3)' }}>
+
+            {hovered ? '▸ VIEW FULL DOSSIER' : 'TAP FOR BIO'}
+          </span>
+        </div>
+      </div>
+    </motion.div>);
+
+}
+
+// ── Animated counter that ticks from 0 → target on hover ──
+function AnimatedValue({ target, active }: {target: number;active: boolean;}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const tweenRef = useRef<gsap.core.Tween | null>(null);
+  const objRef = useRef({ val: 0 });
+
+  useGSAP(() => {
+    if (active) {
+      objRef.current.val = 0;
+      tweenRef.current?.kill();
+      tweenRef.current = gsap.to(objRef.current, {
+        val: target,
+        duration: 1,
+        ease: 'expo.out',
+        onUpdate: () => {
+          if (ref.current) ref.current.textContent = String(Math.round(objRef.current.val));
+        }
+      });
+    } else {
+      tweenRef.current?.kill();
+      objRef.current.val = 0;
+      if (ref.current) ref.current.textContent = '--';
+    }
+  }, [active, target]);
+
+  return <span ref={ref}>--</span>;
+}
+
+// ── Stagger container animation ──
+const gridStagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.1, delayChildren: 0.15 } }
+};
+const cardAnim = {
+  hidden: { opacity: 0, y: 40, scale: 0.96, filter: 'blur(6px)' },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: { duration: 0.7, ease: EXPO_OUT }
+  }
+};
+
+// ── Section ──
+function CrewRoster() {
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const [selectedCrew, setSelectedCrew] = useState<string | null>(null);
+
+  useGSAP(() => {
+    gsap.from('.crew-head', {
+      y: 40,
+      opacity: 0,
+      stagger: 0.1,
+      duration: 0.8,
+      scrollTrigger: { trigger: '.crew-header', start: 'top 85%', once: true }
+    });
+  }, { scope: sectionRef });
+
+  return (
+    <section
+    id="crew"
+    ref={sectionRef}
+    className="relative z-10 py-20 sm:py-28 px-4 sm:px-6">
+
+      <div className="max-w-6xl mx-auto lg:pl-10">
+        {/* Header */}
+        <div className="crew-header mb-12 sm:mb-16">
+          <span className="crew-head inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/15 bg-primary/[0.04] mb-4">
+            <Users className="w-3 h-3 text-primary" />
+            <span className="text-[10px] font-display tracking-[0.2em] text-primary/70">CREW MANIFEST</span>
+          </span>
+
+          <h2 className="crew-head font-display text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.1] mb-4">
+            CREW
+            <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">ROSTER</span>
+          </h2>
+
+          <RevealText
+            text="Hover to initiate biometric verification. All crew vitals monitored in real-time via the Ares-7 medical telemetry network."
+            className="crew-head text-white/30 text-sm sm:text-base max-w-lg leading-relaxed" />
+
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-8">
+          <div className="h-px flex-1 bg-gradient-to-r from-white/[0.06] to-transparent" />
+          <Shield className="w-3.5 h-3.5 text-white/10" />
+          <span className="text-[9px] font-display tracking-[0.25em] text-white/50">CLEARANCE LEVEL ALPHA</span>
+          <div className="h-px flex-1 bg-gradient-to-l from-white/[0.06] to-transparent" />
+        </div>
+
+        {/* Grid */}
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+          variants={gridStagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-60px' }}>
+
+          {CREW.map((member) =>
+          <motion.div key={member.id} variants={cardAnim}>
+              <CrewCard member={member} onSelect={setSelectedCrew} />
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* Footer note */}
+        <div className="mt-8 flex items-center justify-center gap-2">
+          <Radiation className="w-3 h-3 text-white/10" />
+          <span className="text-[8px] font-display tracking-[0.15em] text-white/10">
+            ALL BIOMETRIC DATA ENCRYPTED · HIPAA-MARS COMPLIANT · SOL 247
+          </span>
+        </div>
+      </div>
+
+      {/* Bio overlay */}
+      <CrewBioOverlay crewId={selectedCrew} onClose={() => setSelectedCrew(null)} />
+    </section>);
+
+}
+
+export default memo(CrewRoster);

@@ -1,1 +1,217 @@
-{"path":"src/components/KineticTitle.tsx","content":"import { useRef, useCallback, useMemo } from 'react';\nimport { gsap } from '@/lib/gsap';\n\n/**\n * KineticTitle\n *\n * Renders each letter of the hero H1 as an individually-animated\n * inline-block span. When the user hovers over the title:\n *\n *  1. Every letter **scatters** — flies to a random offset with\n *     random rotation and scale, radiating outward from cursor.\n *  2. After a brief hang, letters **regroup** with a springy\n *     elastic ease back to their origin.\n *\n * \"FRONTIER\" letters get per-letter gradient colours so the\n * fire-gradient persists even when scattered.\n */\n\n// Gradient stops: from-primary (#FF4500) → via-accent (#ff6b35) → to-primary (#FF4500)\nfunction lerpColor(t: number): string {\n  // 0→0.5: #FF4500 → #ff6b35   0.5→1: #ff6b35 → #FF4500\n  const r1 = 255,g1 = 69,b1 = 0;\n  const r2 = 255,g2 = 107,b2 = 53;\n  const tt = t <= 0.5 ? t * 2 : (1 - t) * 2;\n  const r = Math.round(r1 + (r2 - r1) * tt);\n  const g = Math.round(g1 + (g2 - g1) * tt);\n  const b = Math.round(b1 + (b2 - b1) * tt);\n  return `rgb(${r},${g},${b})`;\n}\n\ninterface WordDef {\n  text: string;\n  gradient: boolean;\n  /** extra space after word */\n  spaceAfter?: boolean;\n}\n\nconst WORDS: WordDef[] = [\n{ text: \"HUMANITY'S\", gradient: false },\n{ text: '\\n', gradient: false }, // line break\n{ text: 'NEXT', gradient: false, spaceAfter: true },\n{ text: 'FRONTIER', gradient: true }];\n\n\nfunction rand(a: number, b: number) {\n  return a + Math.random() * (b - a);\n}\n\nexport default function KineticTitle() {\n  const containerRef = useRef<HTMLHeadingElement>(null);\n  const lettersRef = useRef<(HTMLSpanElement | null)[]>([]);\n  const scatteredRef = useRef(false);\n  const tlRef = useRef<gsap.core.Timeline | null>(null);\n\n  // Build the flat list of letters with metadata\n  const letters = useMemo(() => {\n    const result: {char: string;color: string;isBreak: boolean;wordIdx: number;letterIdx: number;spaceAfter: boolean;}[] = [];\n    WORDS.forEach((w, wi) => {\n      if (w.text === '\\n') {\n        result.push({ char: '\\n', color: '', isBreak: true, wordIdx: wi, letterIdx: 0, spaceAfter: false });\n        return;\n      }\n      const chars = w.text.split('');\n      chars.forEach((c, ci) => {\n        const color = w.gradient ?\n        lerpColor(ci / Math.max(chars.length - 1, 1)) :\n        'white';\n        result.push({\n          char: c,\n          color,\n          isBreak: false,\n          wordIdx: wi,\n          letterIdx: ci,\n          spaceAfter: w.spaceAfter === true && ci === chars.length - 1\n        });\n      });\n    });\n    return result;\n  }, []);\n\n  // Assign ref slots\n  const setRef = useCallback(\n    (el: HTMLSpanElement | null, i: number) => {\n      lettersRef.current[i] = el;\n    },\n    []\n  );\n\n  // --- SCATTER ---\n  const scatter = useCallback(\n    (e: React.MouseEvent) => {\n      if (scatteredRef.current) return;\n      scatteredRef.current = true;\n\n      // Kill any running timeline\n      tlRef.current?.kill();\n\n      const rect = containerRef.current?.getBoundingClientRect();\n      if (!rect) return;\n      const cx = e.clientX - rect.left;\n      const cy = e.clientY - rect.top;\n\n      const els = lettersRef.current.filter(Boolean) as HTMLSpanElement[];\n\n      // Scatter phase\n      const tl = gsap.timeline();\n      tlRef.current = tl;\n\n      els.forEach((el) => {\n        const elRect = el.getBoundingClientRect();\n        const elCx = elRect.left + elRect.width / 2 - rect.left;\n        const elCy = elRect.top + elRect.height / 2 - rect.top;\n\n        // Direction away from cursor\n        let dx = elCx - cx;\n        let dy = elCy - cy;\n        const dist = Math.sqrt(dx * dx + dy * dy) || 1;\n\n        // Normalise and add randomness\n        const force = rand(50, 120);\n        dx = dx / dist * force + rand(-30, 30);\n        dy = dy / dist * force + rand(-25, 25);\n        const rot = rand(-35, 35);\n        const sc = rand(0.6, 0.9);\n\n        tl.to(\n          el,\n          {\n            x: dx,\n            y: dy,\n            rotation: rot,\n            scale: sc,\n            opacity: rand(0.4, 0.8),\n            duration: 0.45,\n            ease: 'expo.out'\n          },\n          0\n        );\n      });\n\n      // Regroup phase (starts after short hang)\n      tl.addLabel('regroup', '+=0.12');\n\n      els.forEach((el, i) => {\n        tl.to(\n          el,\n          {\n            x: 0,\n            y: 0,\n            rotation: 0,\n            scale: 1,\n            opacity: 1,\n            duration: 0.9,\n            ease: 'elastic.out(1, 0.4)'\n          },\n          `regroup+=${i * 0.018}`\n        );\n      });\n\n      tl.eventCallback('onComplete', () => {\n        scatteredRef.current = false;\n      });\n    },\n    []\n  );\n\n  // Build line idx for rendering\n  let lineIdx = 0;\n\n  return (\n    <h1\n    ref={containerRef}\n    onMouseEnter={scatter}\n    className=\"font-display font-bold tracking-tight mb-5 sm:mb-6 cursor-default select-none\"\n    style={{ lineHeight: 1.05 }}>\n\n      {letters.map((l, i) => {\n        if (l.isBreak) {\n          lineIdx++;\n          return (\n            <span key={`br-${i}`} className=\"block h-0\" aria-hidden=\"true\" />);\n\n        }\n\n        const isGradientLetter = l.color !== 'white';\n\n        return (\n          <span\n          key={`${l.char}-${i}`}\n          ref={(el) => setRef(el, i)}\n          className={`hero-line inline-block text-[clamp(2rem,6vw,4.5rem)] will-change-transform ${\n          l.char === ' ' ? 'w-[0.3em]' : ''}`\n          }\n          style={{\n            color: isGradientLetter ? l.color : 'white',\n            filter: isGradientLetter ?\n            'drop-shadow(0 0 18px rgba(255,69,0,0.3))' :\n            undefined,\n            display: 'inline-block',\n            // Prevent layout reflow during GSAP transforms\n            transformOrigin: 'center center'\n          }}\n          aria-hidden={l.char === ' ' ? 'true' : undefined}>\n\n            {l.char === ' ' ? '\\u00A0' : l.char}\n            {/* Add a trailing space if this letter ends a word-with-space */}\n            {l.spaceAfter &&\n            <span className=\"inline-block w-[0.35em]\" aria-hidden=\"true\">\n                &nbsp;\n              </span>\n            }\n          </span>);\n\n      })}\n    </h1>);\n\n}","encoding":"utf8"}
+import { useRef, useCallback, useMemo } from 'react';
+import { gsap } from '@/lib/gsap';
+
+/**
+ * KineticTitle
+ *
+ * Renders each letter of the hero H1 as an individually-animated
+ * inline-block span. When the user hovers over the title:
+ *
+ *  1. Every letter **scatters** — flies to a random offset with
+ *     random rotation and scale, radiating outward from cursor.
+ *  2. After a brief hang, letters **regroup** with a springy
+ *     elastic ease back to their origin.
+ *
+ * "FRONTIER" letters get per-letter gradient colours so the
+ * fire-gradient persists even when scattered.
+ */
+
+// Gradient stops: from-primary (#FF4500) → via-accent (#ff6b35) → to-primary (#FF4500)
+function lerpColor(t: number): string {
+  // 0→0.5: #FF4500 → #ff6b35   0.5→1: #ff6b35 → #FF4500
+  const r1 = 255,g1 = 69,b1 = 0;
+  const r2 = 255,g2 = 107,b2 = 53;
+  const tt = t <= 0.5 ? t * 2 : (1 - t) * 2;
+  const r = Math.round(r1 + (r2 - r1) * tt);
+  const g = Math.round(g1 + (g2 - g1) * tt);
+  const b = Math.round(b1 + (b2 - b1) * tt);
+  return `rgb(${r},${g},${b})`;
+}
+
+interface WordDef {
+  text: string;
+  gradient: boolean;
+  /** extra space after word */
+  spaceAfter?: boolean;
+}
+
+const WORDS: WordDef[] = [
+{ text: "HUMANITY'S", gradient: false },
+{ text: '\n', gradient: false }, // line break
+{ text: 'NEXT', gradient: false, spaceAfter: true },
+{ text: 'FRONTIER', gradient: true }];
+
+
+function rand(a: number, b: number) {
+  return a + Math.random() * (b - a);
+}
+
+export default function KineticTitle() {
+  const containerRef = useRef<HTMLHeadingElement>(null);
+  const lettersRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const scatteredRef = useRef(false);
+  const tlRef = useRef<gsap.core.Timeline | null>(null);
+
+  // Build the flat list of letters with metadata
+  const letters = useMemo(() => {
+    const result: {char: string;color: string;isBreak: boolean;wordIdx: number;letterIdx: number;spaceAfter: boolean;}[] = [];
+    WORDS.forEach((w, wi) => {
+      if (w.text === '\n') {
+        result.push({ char: '\n', color: '', isBreak: true, wordIdx: wi, letterIdx: 0, spaceAfter: false });
+        return;
+      }
+      const chars = w.text.split('');
+      chars.forEach((c, ci) => {
+        const color = w.gradient ?
+        lerpColor(ci / Math.max(chars.length - 1, 1)) :
+        'white';
+        result.push({
+          char: c,
+          color,
+          isBreak: false,
+          wordIdx: wi,
+          letterIdx: ci,
+          spaceAfter: w.spaceAfter === true && ci === chars.length - 1
+        });
+      });
+    });
+    return result;
+  }, []);
+
+  // Assign ref slots
+  const setRef = useCallback(
+    (el: HTMLSpanElement | null, i: number) => {
+      lettersRef.current[i] = el;
+    },
+    []
+  );
+
+  // --- SCATTER ---
+  const scatter = useCallback(
+    (e: React.MouseEvent) => {
+      if (scatteredRef.current) return;
+      scatteredRef.current = true;
+
+      // Kill any running timeline
+      tlRef.current?.kill();
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+
+      const els = lettersRef.current.filter(Boolean) as HTMLSpanElement[];
+
+      // Scatter phase
+      const tl = gsap.timeline();
+      tlRef.current = tl;
+
+      els.forEach((el) => {
+        const elRect = el.getBoundingClientRect();
+        const elCx = elRect.left + elRect.width / 2 - rect.left;
+        const elCy = elRect.top + elRect.height / 2 - rect.top;
+
+        // Direction away from cursor
+        let dx = elCx - cx;
+        let dy = elCy - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        // Normalise and add randomness
+        const force = rand(50, 120);
+        dx = dx / dist * force + rand(-30, 30);
+        dy = dy / dist * force + rand(-25, 25);
+        const rot = rand(-35, 35);
+        const sc = rand(0.6, 0.9);
+
+        tl.to(
+          el,
+          {
+            x: dx,
+            y: dy,
+            rotation: rot,
+            scale: sc,
+            opacity: rand(0.4, 0.8),
+            duration: 0.45,
+            ease: 'expo.out'
+          },
+          0
+        );
+      });
+
+      // Regroup phase (starts after short hang)
+      tl.addLabel('regroup', '+=0.12');
+
+      els.forEach((el, i) => {
+        tl.to(
+          el,
+          {
+            x: 0,
+            y: 0,
+            rotation: 0,
+            scale: 1,
+            opacity: 1,
+            duration: 0.9,
+            ease: 'elastic.out(1, 0.4)'
+          },
+          `regroup+=${i * 0.018}`
+        );
+      });
+
+      tl.eventCallback('onComplete', () => {
+        scatteredRef.current = false;
+      });
+    },
+    []
+  );
+
+  // Build line idx for rendering
+  let lineIdx = 0;
+
+  return (
+    <h1
+    ref={containerRef}
+    onMouseEnter={scatter}
+    className="font-display font-bold tracking-tight mb-5 sm:mb-6 cursor-default select-none"
+    style={{ lineHeight: 1.05 }}>
+
+      {letters.map((l, i) => {
+        if (l.isBreak) {
+          lineIdx++;
+          return (
+            <span key={`br-${i}`} className="block h-0" aria-hidden="true" />);
+
+        }
+
+        const isGradientLetter = l.color !== 'white';
+
+        return (
+          <span
+          key={`${l.char}-${i}`}
+          ref={(el) => setRef(el, i)}
+          className={`hero-line inline-block text-[clamp(2rem,6vw,4.5rem)] will-change-transform ${
+          l.char === ' ' ? 'w-[0.3em]' : ''}`
+          }
+          style={{
+            color: isGradientLetter ? l.color : 'white',
+            filter: isGradientLetter ?
+            'drop-shadow(0 0 18px rgba(255,69,0,0.3))' :
+            undefined,
+            display: 'inline-block',
+            // Prevent layout reflow during GSAP transforms
+            transformOrigin: 'center center'
+          }}
+          aria-hidden={l.char === ' ' ? 'true' : undefined}>
+
+            {l.char === ' ' ? '\u00A0' : l.char}
+            {/* Add a trailing space if this letter ends a word-with-space */}
+            {l.spaceAfter &&
+            <span className="inline-block w-[0.35em]" aria-hidden="true">
+                &nbsp;
+              </span>
+            }
+          </span>);
+
+      })}
+    </h1>);
+
+}

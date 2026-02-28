@@ -1,1 +1,67 @@
-{"path":"src/components/LazyLoadErrorBoundary.tsx","content":"import { Component, type ReactNode } from 'react';\n\ninterface Props {\n  children: ReactNode;\n}\n\ninterface State {\n  hasError: boolean;\n  retryCount: number;\n}\n\nconst MAX_RETRIES = 2;\n\n/**\n * Error boundary that catches dynamic import failures (stale Vite HMR modules)\n * and auto-recovers by retrying the render or reloading the page.\n */\nexport default class LazyLoadErrorBoundary extends Component<Props, State> {\n  state: State = { hasError: false, retryCount: 0 };\n\n  static getDerivedStateFromError(): Partial<State> {\n    return { hasError: true };\n  }\n\n  componentDidCatch(error: Error) {\n    const isChunkError =\n    error.message.includes('dynamically imported module') ||\n    error.message.includes('Failed to fetch') ||\n    error.message.includes('Loading chunk') ||\n    error.message.includes('Loading CSS chunk') ||\n    error.name === 'ChunkLoadError';\n\n    if (isChunkError && this.state.retryCount < MAX_RETRIES) {\n      // Auto-retry: reset the boundary so React re-renders & retries the import\n      this.setState((prev) => ({\n        hasError: false,\n        retryCount: prev.retryCount + 1\n      }));\n    } else if (isChunkError) {\n      // Exhausted retries → hard reload to get fresh modules\n      window.location.reload();\n    }\n  }\n\n  render() {\n    if (this.state.hasError) {\n      return (\n        <div className=\"min-h-screen flex items-center justify-center bg-[#050508] text-white\">\n          <div className=\"text-center space-y-4 p-8\">\n            <div className=\"text-4xl\">🛰️</div>\n            <h2 className=\"text-xl font-semibold tracking-wide\">Signal Interrupted</h2>\n            <p className=\"text-white/50 text-sm max-w-xs mx-auto\">\n              Lost connection to mission module. Attempting reconnection…\n            </p>\n            <button\n            onClick={() => window.location.reload()}\n            className=\"mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm font-medium transition-colors\">\n\n              Reload Mission Control\n            </button>\n          </div>\n        </div>);\n\n    }\n    return this.props.children;\n  }\n}","encoding":"utf8"}
+import { Component, type ReactNode } from 'react';
+
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  retryCount: number;
+}
+
+const MAX_RETRIES = 2;
+
+/**
+ * Error boundary that catches dynamic import failures (stale Vite HMR modules)
+ * and auto-recovers by retrying the render or reloading the page.
+ */
+export default class LazyLoadErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false, retryCount: 0 };
+
+  static getDerivedStateFromError(): Partial<State> {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    const isChunkError =
+    error.message.includes('dynamically imported module') ||
+    error.message.includes('Failed to fetch') ||
+    error.message.includes('Loading chunk') ||
+    error.message.includes('Loading CSS chunk') ||
+    error.name === 'ChunkLoadError';
+
+    if (isChunkError && this.state.retryCount < MAX_RETRIES) {
+      // Auto-retry: reset the boundary so React re-renders & retries the import
+      this.setState((prev) => ({
+        hasError: false,
+        retryCount: prev.retryCount + 1
+      }));
+    } else if (isChunkError) {
+      // Exhausted retries → hard reload to get fresh modules
+      window.location.reload();
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#050508] text-white">
+          <div className="text-center space-y-4 p-8">
+            <div className="text-4xl">🛰️</div>
+            <h2 className="text-xl font-semibold tracking-wide">Signal Interrupted</h2>
+            <p className="text-white/50 text-sm max-w-xs mx-auto">
+              Lost connection to mission module. Attempting reconnection…
+            </p>
+            <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm font-medium transition-colors">
+
+              Reload Mission Control
+            </button>
+          </div>
+        </div>);
+
+    }
+    return this.props.children;
+  }
+}

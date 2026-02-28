@@ -1,1 +1,78 @@
-{"path":"src/components/LocaleToggle.tsx","content":"import { motion, AnimatePresence } from 'framer-motion';\nimport { Globe } from 'lucide-react';\nimport { useLocale } from '@/hooks/useLocale';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useState } from 'react';\n\nexport default function LocaleToggle() {\n  const { locale, toggleLocale, isRTL } = useLocale();\n  const [showLabel, setShowLabel] = useState(false);\n\n  return (\n    <div\n    className={`fixed top-[56px] lg:top-5 z-[200] ${isRTL ? 'left-3 lg:left-6' : 'right-3 lg:right-5'}`}\n    style={{ direction: 'ltr' }}>\n\n      <motion.button\n        onClick={toggleLocale}\n        onMouseEnter={() => setShowLabel(true)}\n        onMouseLeave={() => setShowLabel(false)}\n        onFocus={() => setShowLabel(true)}\n        onBlur={() => setShowLabel(false)}\n        whileHover={{ scale: 1.1 }}\n        whileTap={{ scale: 0.92 }}\n        transition={{ duration: 0.3, ease: EXPO_OUT }}\n        className=\"\n          group relative flex items-center gap-2\n          h-10 rounded-full backdrop-blur-md border\n          bg-white/[0.04] border-white/[0.08]\n          text-white/50 hover:text-white/80\n          transition-colors duration-300 overflow-hidden\n          px-3\n        \"\n\n\n\n\n\n\n\n        aria-label={locale === 'en' ? 'Switch to Hebrew' : 'Switch to English'}>\n\n        <Globe className=\"w-4 h-4 shrink-0\" />\n\n        {/* Current locale label */}\n        <AnimatePresence mode=\"wait\">\n          <motion.span\n            key={locale}\n            initial={{ y: 10, opacity: 0 }}\n            animate={{ y: 0, opacity: 1 }}\n            exit={{ y: -10, opacity: 0 }}\n            transition={{ duration: 0.25, ease: EXPO_OUT }}\n            className=\"text-[11px] font-display tracking-[0.15em] font-medium\">\n\n            {locale === 'en' ? 'EN' : 'עב'}\n          </motion.span>\n        </AnimatePresence>\n      </motion.button>\n\n      {/* Hover tooltip */}\n      <AnimatePresence>\n        {showLabel &&\n        <motion.div\n          initial={{ opacity: 0, y: -4, scale: 0.95 }}\n          animate={{ opacity: 1, y: 0, scale: 1 }}\n          exit={{ opacity: 0, y: -4, scale: 0.95 }}\n          transition={{ duration: 0.2, ease: EXPO_OUT }}\n          className=\"absolute top-full mt-2 right-0 px-3 py-1.5 rounded-lg bg-secondary/95 backdrop-blur-md border border-white/[0.08] shadow-xl whitespace-nowrap\"\n          role=\"tooltip\">\n\n            <span className=\"text-[10px] font-display text-white/60 tracking-wider\">\n              {locale === 'en' ? 'עברית' : 'English'}\n            </span>\n          </motion.div>\n        }\n      </AnimatePresence>\n    </div>);\n\n}","encoding":"utf8"}
+import { motion, AnimatePresence } from 'framer-motion';
+import { Globe } from 'lucide-react';
+import { useLocale } from '@/hooks/useLocale';
+import { EXPO_OUT } from '@/lib/easing';
+import { useState } from 'react';
+
+export default function LocaleToggle() {
+  const { locale, toggleLocale, isRTL } = useLocale();
+  const [showLabel, setShowLabel] = useState(false);
+
+  return (
+    <div
+    className={`fixed top-[56px] lg:top-5 z-[200] ${isRTL ? 'left-3 lg:left-6' : 'right-3 lg:right-5'}`}
+    style={{ direction: 'ltr' }}>
+
+      <motion.button
+        onClick={toggleLocale}
+        onMouseEnter={() => setShowLabel(true)}
+        onMouseLeave={() => setShowLabel(false)}
+        onFocus={() => setShowLabel(true)}
+        onBlur={() => setShowLabel(false)}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.92 }}
+        transition={{ duration: 0.3, ease: EXPO_OUT }}
+        className="
+          group relative flex items-center gap-2
+          h-10 rounded-full backdrop-blur-md border
+          bg-white/[0.04] border-white/[0.08]
+          text-white/50 hover:text-white/80
+          transition-colors duration-300 overflow-hidden
+          px-3
+        "
+
+
+
+
+
+
+
+        aria-label={locale === 'en' ? 'Switch to Hebrew' : 'Switch to English'}>
+
+        <Globe className="w-4 h-4 shrink-0" />
+
+        {/* Current locale label */}
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={locale}
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -10, opacity: 0 }}
+            transition={{ duration: 0.25, ease: EXPO_OUT }}
+            className="text-[11px] font-display tracking-[0.15em] font-medium">
+
+            {locale === 'en' ? 'EN' : 'עב'}
+          </motion.span>
+        </AnimatePresence>
+      </motion.button>
+
+      {/* Hover tooltip */}
+      <AnimatePresence>
+        {showLabel &&
+        <motion.div
+          initial={{ opacity: 0, y: -4, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -4, scale: 0.95 }}
+          transition={{ duration: 0.2, ease: EXPO_OUT }}
+          className="absolute top-full mt-2 right-0 px-3 py-1.5 rounded-lg bg-secondary/95 backdrop-blur-md border border-white/[0.08] shadow-xl whitespace-nowrap"
+          role="tooltip">
+
+            <span className="text-[10px] font-display text-white/60 tracking-wider">
+              {locale === 'en' ? 'עברית' : 'English'}
+            </span>
+          </motion.div>
+        }
+      </AnimatePresence>
+    </div>);
+
+}

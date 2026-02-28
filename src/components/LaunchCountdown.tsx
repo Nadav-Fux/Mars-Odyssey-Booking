@@ -1,1 +1,72 @@
-{"path":"src/components/LaunchCountdown.tsx","content":"import { useState, useEffect, useRef } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { EXPO_OUT } from '@/lib/easing';\n\n// Launch date: March 15, 2026\nconst LAUNCH = new Date('2027-03-15T09:00:00Z').getTime();\n\ninterface TimeUnit {\n  value: number;\n  label: string;\n}\n\nfunction pad(n: number) {\n  return String(Math.max(0, n)).padStart(2, '0');\n}\n\nfunction FlipDigit({ value, label }: {value: string;label: string;}) {\n  const prev = useRef(value);\n  const changed = prev.current !== value;\n  prev.current = value;\n\n  return (\n    <div className=\"flex flex-col items-center gap-0.5\">\n      <div className=\"relative overflow-hidden\">\n        <AnimatePresence mode=\"popLayout\">\n          <motion.span\n            key={value}\n            initial={changed ? { y: -14, opacity: 0 } : false}\n            animate={{ y: 0, opacity: 1 }}\n            exit={{ y: 14, opacity: 0 }}\n            transition={{ duration: 0.35, ease: EXPO_OUT }}\n            className=\"block font-mono text-[11px] sm:text-xs font-bold text-white tabular-nums\">\n\n            {value}\n          </motion.span>\n        </AnimatePresence>\n      </div>\n      <span className=\"text-[7px] sm:text-[8px] text-white/50 tracking-[0.15em] font-display uppercase\">\n        {label}\n      </span>\n    </div>);\n\n}\n\nexport default function LaunchCountdown() {\n  const [diff, setDiff] = useState(() => Math.max(0, LAUNCH - Date.now()));\n\n  useEffect(() => {\n    const id = setInterval(() => {\n      setDiff(Math.max(0, LAUNCH - Date.now()));\n    }, 1000);\n    return () => clearInterval(id);\n  }, []);\n\n  const secs = Math.floor(diff / 1000);\n  const days = Math.floor(secs / 86400);\n  const hrs = Math.floor(secs % 86400 / 3600);\n  const mins = Math.floor(secs % 3600 / 60);\n  const s = secs % 60;\n\n  return (\n    <div className=\"inline-flex items-center gap-1.5 sm:gap-2\">\n      <FlipDigit value={String(days)} label=\"DAYS\" />\n      <span className=\"text-primary/40 text-[10px] font-mono mt-[-8px]\">:</span>\n      <FlipDigit value={pad(hrs)} label=\"HRS\" />\n      <span className=\"text-primary/40 text-[10px] font-mono mt-[-8px]\">:</span>\n      <FlipDigit value={pad(mins)} label=\"MIN\" />\n      <span className=\"text-primary/40 text-[10px] font-mono mt-[-8px]\">:</span>\n      <FlipDigit value={pad(s)} label=\"SEC\" />\n    </div>);\n\n}","encoding":"utf8"}
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EXPO_OUT } from '@/lib/easing';
+
+// Launch date: March 15, 2026
+const LAUNCH = new Date('2027-03-15T09:00:00Z').getTime();
+
+interface TimeUnit {
+  value: number;
+  label: string;
+}
+
+function pad(n: number) {
+  return String(Math.max(0, n)).padStart(2, '0');
+}
+
+function FlipDigit({ value, label }: {value: string;label: string;}) {
+  const prev = useRef(value);
+  const changed = prev.current !== value;
+  prev.current = value;
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="relative overflow-hidden">
+        <AnimatePresence mode="popLayout">
+          <motion.span
+            key={value}
+            initial={changed ? { y: -14, opacity: 0 } : false}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 14, opacity: 0 }}
+            transition={{ duration: 0.35, ease: EXPO_OUT }}
+            className="block font-mono text-[11px] sm:text-xs font-bold text-white tabular-nums">
+
+            {value}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+      <span className="text-[7px] sm:text-[8px] text-white/50 tracking-[0.15em] font-display uppercase">
+        {label}
+      </span>
+    </div>);
+
+}
+
+export default function LaunchCountdown() {
+  const [diff, setDiff] = useState(() => Math.max(0, LAUNCH - Date.now()));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDiff(Math.max(0, LAUNCH - Date.now()));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const secs = Math.floor(diff / 1000);
+  const days = Math.floor(secs / 86400);
+  const hrs = Math.floor(secs % 86400 / 3600);
+  const mins = Math.floor(secs % 3600 / 60);
+  const s = secs % 60;
+
+  return (
+    <div className="inline-flex items-center gap-1.5 sm:gap-2">
+      <FlipDigit value={String(days)} label="DAYS" />
+      <span className="text-primary/40 text-[10px] font-mono mt-[-8px]">:</span>
+      <FlipDigit value={pad(hrs)} label="HRS" />
+      <span className="text-primary/40 text-[10px] font-mono mt-[-8px]">:</span>
+      <FlipDigit value={pad(mins)} label="MIN" />
+      <span className="text-primary/40 text-[10px] font-mono mt-[-8px]">:</span>
+      <FlipDigit value={pad(s)} label="SEC" />
+    </div>);
+
+}

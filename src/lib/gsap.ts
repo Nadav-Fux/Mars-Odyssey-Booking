@@ -1,1 +1,21 @@
-{"path":"src/lib/gsap.ts","content":"import gsap from 'gsap';\nimport { ScrollTrigger } from 'gsap/ScrollTrigger';\n\ngsap.registerPlugin(ScrollTrigger);\n\n// Performance defaults\ngsap.defaults({\n  ease: 'expo.out',\n  duration: 0.8,\n});\n\n// Configure ScrollTrigger for performance\nScrollTrigger.config({\n  // Limit recalculations\n  ignoreMobileResize: true,\n});\n\n// Set global ticker for consistent frame pacing\ngsap.ticker.lagSmoothing(500, 33); // Cap lag compensation at 500ms, target 30fps min\n\nexport { gsap, ScrollTrigger };\n","encoding":"utf8"}
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+// Performance defaults
+gsap.defaults({
+  ease: 'expo.out',
+  duration: 0.8,
+});
+
+// Configure ScrollTrigger for performance
+ScrollTrigger.config({
+  // Limit recalculations
+  ignoreMobileResize: true,
+});
+
+// Set global ticker for consistent frame pacing
+gsap.ticker.lagSmoothing(500, 33); // Cap lag compensation at 500ms, target 30fps min
+
+export { gsap, ScrollTrigger };

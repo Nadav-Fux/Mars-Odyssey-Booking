@@ -1,1 +1,218 @@
-{"path":"src/lib/i18n.ts","content":"/* ================================================================\n   i18n — Lightweight localization for ARES-X\n\n   Two locales: English (LTR) and Hebrew (RTL).\n   Strings are organized by section for easy maintenance.\n   ================================================================ */\n\nexport type Locale = 'en' | 'he';\n\nexport interface Strings {\n  /* ── Navigation ── */\n  nav: {\n    hero: string;\n    destinations: string;\n    experience: string;\n    fleet: string;\n    specs: string;\n    booking: string;\n  };\n\n  /* ── Hero ── */\n  hero: {\n    overline: string;\n    title1: string;\n    title2: string;\n    description: string;\n    ctaPrimary: string;\n    ctaSecondary: string;\n    distance: string;\n    transit: string;\n    passengers: string;\n  };\n\n  /* ── Destinations ── */\n  destinations: {\n    badge: string;\n    heading: string;\n    headingAccent: string;\n    description: string;\n  };\n\n  /* ── Experience ── */\n  experience: {\n    badge: string;\n    heading: string;\n    headingAccent: string;\n    description: string;\n  };\n\n  /* ── Fleet ── */\n  fleet: {\n    badge: string;\n    heading: string;\n    headingAccent: string;\n  };\n\n  /* ── Booking ── */\n  booking: {\n    badge: string;\n    heading: string;\n    headingAccent: string;\n    description: string;\n    finePrint: string;\n  };\n\n  /* ── Footer ── */\n  footer: {\n    tagline: string;\n    copyright: string;\n  };\n\n  /* ── Misc ── */\n  misc: {\n    explore: string;\n    batterySaverOn: string;\n    batterySaverOff: string;\n    animationsReduced: string;\n    fullAnimations: string;\n    mobileDetected: string;\n    discoveryMode: string;\n    discoveryOn: string;\n    discoveryOff: string;\n  };\n}\n\nexport const translations: Record<Locale, Strings> = {\n  en: {\n    nav: {\n      hero: 'HOME',\n      destinations: 'DESTINATIONS',\n      experience: 'EXPERIENCE',\n      fleet: 'FLEET',\n      specs: 'SPECS',\n      booking: 'BOOK',\n    },\n    hero: {\n      overline: 'NEXT LAUNCH WINDOW — MARCH 2026',\n      title1: 'YOUR JOURNEY',\n      title2: 'TO MARS',\n      description:\n        'ARES-X is the world\\'s first luxury interplanetary tourism program. Book your seat on the inaugural commercial voyage to the Red Planet.',\n      ctaPrimary: 'RESERVE PASSAGE',\n      ctaSecondary: 'THE EXPERIENCE',\n      distance: 'DISTANCE',\n      transit: 'TRANSIT',\n      passengers: 'PASSENGERS',\n    },\n    destinations: {\n      badge: 'LANDING SITES',\n      heading: 'EXPLORE',\n      headingAccent: 'MARS',\n      description:\n        'Four meticulously prepared landing sites, each offering a unique Martian experience.',\n    },\n    experience: {\n      badge: 'THE JOURNEY',\n      heading: 'MISSION',\n      headingAccent: 'TIMELINE',\n      description:\n        'From launch to landing — every phase of your interplanetary voyage, planned to the second.',\n    },\n    fleet: {\n      badge: 'SPACECRAFT',\n      heading: 'THE',\n      headingAccent: 'FLEET',\n    },\n    booking: {\n      badge: 'RESERVE YOUR SEAT',\n      heading: 'BOOK YOUR',\n      headingAccent: 'PASSAGE',\n      description:\n        'Limited seats per launch window. Flick through the classes, pick your seat, and launch.',\n      finePrint:\n        'All prices in USD • Fully refundable up to T-30 days • Includes training program',\n    },\n    footer: {\n      tagline: 'Making Mars accessible to humanity',\n      copyright: '© 2026 ARES-X Corporation. All rights reserved.',\n    },\n    misc: {\n      explore: 'EXPLORE',\n      batterySaverOn: 'BATTERY SAVER ON',\n      batterySaverOff: 'BATTERY SAVER OFF',\n      animationsReduced: 'Animations reduced for performance',\n      fullAnimations: 'Full animations active',\n      mobileDetected: 'Mobile detected',\n      discoveryMode: 'DISCOVERY MODE',\n      discoveryOn: 'Learning tooltips active',\n      discoveryOff: 'Tap to explore tech concepts',\n    },\n  },\n\n  he: {\n    nav: {\n      hero: 'בית',\n      destinations: 'יעדים',\n      experience: 'חוויה',\n      fleet: 'צי',\n      specs: 'מפרט',\n      booking: 'הזמנה',\n    },\n    hero: {\n      overline: 'חלון השיגור הבא — מרץ 2026',\n      title1: 'המסע שלך',\n      title2: 'למאדים',\n      description:\n        'ARES-X היא תוכנית התיירות הבין-כוכבית הפאר הראשונה בעולם. הזמינו מקום בטיסה המסחרית הראשונה לכוכב האדום.',\n      ctaPrimary: 'הזמן מעבר',\n      ctaSecondary: 'החוויה',\n      distance: 'מרחק',\n      transit: 'מעבר',\n      passengers: 'נוסעים',\n    },\n    destinations: {\n      badge: 'אתרי נחיתה',\n      heading: 'חקרו את',\n      headingAccent: 'מאדים',\n      description:\n        'ארבעה אתרי נחיתה שהוכנו בקפידה, כל אחד מציע חוויה מאדימית ייחודית.',\n    },\n    experience: {\n      badge: 'המסע',\n      heading: 'לוח זמנים',\n      headingAccent: 'המשימה',\n      description:\n        'משיגור ועד נחיתה — כל שלב במסע הבין-כוכבי שלכם, מתוכנן עד השנייה.',\n    },\n    fleet: {\n      badge: 'חלליות',\n      heading: 'הצי',\n      headingAccent: 'שלנו',\n    },\n    booking: {\n      badge: 'הזמינו את מקומכם',\n      heading: 'הזמינו את',\n      headingAccent: 'המעבר',\n      description:\n        'מקומות מוגבלים בכל חלון שיגור. דפדפו בין המחלקות, בחרו מושב, והמריאו.',\n      finePrint:\n        'כל המחירים בדולרים • החזר מלא עד T-30 יום • כולל תוכנית הכשרה',\n    },\n    footer: {\n      tagline: 'הופכים את מאדים לנגיש לאנושות',\n      copyright: '© 2026 ARES-X Corporation. כל הזכויות שמורות.',\n    },\n    misc: {\n      explore: 'חקרו',\n      batterySaverOn: 'חיסכון בסוללה פעיל',\n      batterySaverOff: 'חיסכון בסוללה כבוי',\n      animationsReduced: 'אנימציות מופחתות לביצועים',\n      fullAnimations: 'אנימציות מלאות פעילות',\n      mobileDetected: 'זוהה מכשיר נייד',\n      discoveryMode: 'מצב גילוי',\n      discoveryOn: 'תוויות למידה פעילות',\n      discoveryOff: 'לחצו לחקור מושגים טכנולוגיים',\n    },\n  },\n};\n","encoding":"utf8"}
+/* ================================================================
+   i18n — Lightweight localization for ARES-X
+
+   Two locales: English (LTR) and Hebrew (RTL).
+   Strings are organized by section for easy maintenance.
+   ================================================================ */
+
+export type Locale = 'en' | 'he';
+
+export interface Strings {
+  /* ── Navigation ── */
+  nav: {
+    hero: string;
+    destinations: string;
+    experience: string;
+    fleet: string;
+    specs: string;
+    booking: string;
+  };
+
+  /* ── Hero ── */
+  hero: {
+    overline: string;
+    title1: string;
+    title2: string;
+    description: string;
+    ctaPrimary: string;
+    ctaSecondary: string;
+    distance: string;
+    transit: string;
+    passengers: string;
+  };
+
+  /* ── Destinations ── */
+  destinations: {
+    badge: string;
+    heading: string;
+    headingAccent: string;
+    description: string;
+  };
+
+  /* ── Experience ── */
+  experience: {
+    badge: string;
+    heading: string;
+    headingAccent: string;
+    description: string;
+  };
+
+  /* ── Fleet ── */
+  fleet: {
+    badge: string;
+    heading: string;
+    headingAccent: string;
+  };
+
+  /* ── Booking ── */
+  booking: {
+    badge: string;
+    heading: string;
+    headingAccent: string;
+    description: string;
+    finePrint: string;
+  };
+
+  /* ── Footer ── */
+  footer: {
+    tagline: string;
+    copyright: string;
+  };
+
+  /* ── Misc ── */
+  misc: {
+    explore: string;
+    batterySaverOn: string;
+    batterySaverOff: string;
+    animationsReduced: string;
+    fullAnimations: string;
+    mobileDetected: string;
+    discoveryMode: string;
+    discoveryOn: string;
+    discoveryOff: string;
+  };
+}
+
+export const translations: Record<Locale, Strings> = {
+  en: {
+    nav: {
+      hero: 'HOME',
+      destinations: 'DESTINATIONS',
+      experience: 'EXPERIENCE',
+      fleet: 'FLEET',
+      specs: 'SPECS',
+      booking: 'BOOK',
+    },
+    hero: {
+      overline: 'NEXT LAUNCH WINDOW — MARCH 2026',
+      title1: 'YOUR JOURNEY',
+      title2: 'TO MARS',
+      description:
+        'ARES-X is the world\'s first luxury interplanetary tourism program. Book your seat on the inaugural commercial voyage to the Red Planet.',
+      ctaPrimary: 'RESERVE PASSAGE',
+      ctaSecondary: 'THE EXPERIENCE',
+      distance: 'DISTANCE',
+      transit: 'TRANSIT',
+      passengers: 'PASSENGERS',
+    },
+    destinations: {
+      badge: 'LANDING SITES',
+      heading: 'EXPLORE',
+      headingAccent: 'MARS',
+      description:
+        'Four meticulously prepared landing sites, each offering a unique Martian experience.',
+    },
+    experience: {
+      badge: 'THE JOURNEY',
+      heading: 'MISSION',
+      headingAccent: 'TIMELINE',
+      description:
+        'From launch to landing — every phase of your interplanetary voyage, planned to the second.',
+    },
+    fleet: {
+      badge: 'SPACECRAFT',
+      heading: 'THE',
+      headingAccent: 'FLEET',
+    },
+    booking: {
+      badge: 'RESERVE YOUR SEAT',
+      heading: 'BOOK YOUR',
+      headingAccent: 'PASSAGE',
+      description:
+        'Limited seats per launch window. Flick through the classes, pick your seat, and launch.',
+      finePrint:
+        'All prices in USD • Fully refundable up to T-30 days • Includes training program',
+    },
+    footer: {
+      tagline: 'Making Mars accessible to humanity',
+      copyright: '© 2026 ARES-X Corporation. All rights reserved.',
+    },
+    misc: {
+      explore: 'EXPLORE',
+      batterySaverOn: 'BATTERY SAVER ON',
+      batterySaverOff: 'BATTERY SAVER OFF',
+      animationsReduced: 'Animations reduced for performance',
+      fullAnimations: 'Full animations active',
+      mobileDetected: 'Mobile detected',
+      discoveryMode: 'DISCOVERY MODE',
+      discoveryOn: 'Learning tooltips active',
+      discoveryOff: 'Tap to explore tech concepts',
+    },
+  },
+
+  he: {
+    nav: {
+      hero: 'בית',
+      destinations: 'יעדים',
+      experience: 'חוויה',
+      fleet: 'צי',
+      specs: 'מפרט',
+      booking: 'הזמנה',
+    },
+    hero: {
+      overline: 'חלון השיגור הבא — מרץ 2026',
+      title1: 'המסע שלך',
+      title2: 'למאדים',
+      description:
+        'ARES-X היא תוכנית התיירות הבין-כוכבית הפאר הראשונה בעולם. הזמינו מקום בטיסה המסחרית הראשונה לכוכב האדום.',
+      ctaPrimary: 'הזמן מעבר',
+      ctaSecondary: 'החוויה',
+      distance: 'מרחק',
+      transit: 'מעבר',
+      passengers: 'נוסעים',
+    },
+    destinations: {
+      badge: 'אתרי נחיתה',
+      heading: 'חקרו את',
+      headingAccent: 'מאדים',
+      description:
+        'ארבעה אתרי נחיתה שהוכנו בקפידה, כל אחד מציע חוויה מאדימית ייחודית.',
+    },
+    experience: {
+      badge: 'המסע',
+      heading: 'לוח זמנים',
+      headingAccent: 'המשימה',
+      description:
+        'משיגור ועד נחיתה — כל שלב במסע הבין-כוכבי שלכם, מתוכנן עד השנייה.',
+    },
+    fleet: {
+      badge: 'חלליות',
+      heading: 'הצי',
+      headingAccent: 'שלנו',
+    },
+    booking: {
+      badge: 'הזמינו את מקומכם',
+      heading: 'הזמינו את',
+      headingAccent: 'המעבר',
+      description:
+        'מקומות מוגבלים בכל חלון שיגור. דפדפו בין המחלקות, בחרו מושב, והמריאו.',
+      finePrint:
+        'כל המחירים בדולרים • החזר מלא עד T-30 יום • כולל תוכנית הכשרה',
+    },
+    footer: {
+      tagline: 'הופכים את מאדים לנגיש לאנושות',
+      copyright: '© 2026 ARES-X Corporation. כל הזכויות שמורות.',
+    },
+    misc: {
+      explore: 'חקרו',
+      batterySaverOn: 'חיסכון בסוללה פעיל',
+      batterySaverOff: 'חיסכון בסוללה כבוי',
+      animationsReduced: 'אנימציות מופחתות לביצועים',
+      fullAnimations: 'אנימציות מלאות פעילות',
+      mobileDetected: 'זוהה מכשיר נייד',
+      discoveryMode: 'מצב גילוי',
+      discoveryOn: 'תוויות למידה פעילות',
+      discoveryOff: 'לחצו לחקור מושגים טכנולוגיים',
+    },
+  },
+};

@@ -1,1 +1,49 @@
-{"path":"src/hooks/useKonamiCode.ts","content":"import { useState, useEffect, useCallback, useRef } from 'react';\n\n/* ═══════════════════════════════════════════════════════\n   useKonamiCode — ↑↑↓↓←→←→BA\n\n   Returns `activated` boolean that flips to true once\n   the classic Konami code is entered via keyboard.\n   Also exposes `reset` to dismiss.\n   ═══════════════════════════════════════════════════════ */\n\nconst KONAMI = [\n  'ArrowUp', 'ArrowUp',\n  'ArrowDown', 'ArrowDown',\n  'ArrowLeft', 'ArrowRight',\n  'ArrowLeft', 'ArrowRight',\n  'b', 'a',\n];\n\nexport function useKonamiCode() {\n  const [activated, setActivated] = useState(false);\n  const index = useRef(0);\n\n  useEffect(() => {\n    if (activated) return; // stop listening once activated\n\n    const onKey = (e: KeyboardEvent) => {\n      const expected = KONAMI[index.current];\n      if (e.key === expected || e.key.toLowerCase() === expected) {\n        index.current++;\n        if (index.current >= KONAMI.length) {\n          setActivated(true);\n          index.current = 0;\n        }\n      } else {\n        index.current = 0;\n      }\n    };\n\n    window.addEventListener('keydown', onKey);\n    return () => window.removeEventListener('keydown', onKey);\n  }, [activated]);\n\n  const reset = useCallback(() => {\n    setActivated(false);\n    index.current = 0;\n  }, []);\n\n  return { activated, reset };\n}\n","encoding":"utf8"}
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+/* ═══════════════════════════════════════════════════════
+   useKonamiCode — ↑↑↓↓←→←→BA
+
+   Returns `activated` boolean that flips to true once
+   the classic Konami code is entered via keyboard.
+   Also exposes `reset` to dismiss.
+   ═══════════════════════════════════════════════════════ */
+
+const KONAMI = [
+  'ArrowUp', 'ArrowUp',
+  'ArrowDown', 'ArrowDown',
+  'ArrowLeft', 'ArrowRight',
+  'ArrowLeft', 'ArrowRight',
+  'b', 'a',
+];
+
+export function useKonamiCode() {
+  const [activated, setActivated] = useState(false);
+  const index = useRef(0);
+
+  useEffect(() => {
+    if (activated) return; // stop listening once activated
+
+    const onKey = (e: KeyboardEvent) => {
+      const expected = KONAMI[index.current];
+      if (e.key === expected || e.key.toLowerCase() === expected) {
+        index.current++;
+        if (index.current >= KONAMI.length) {
+          setActivated(true);
+          index.current = 0;
+        }
+      } else {
+        index.current = 0;
+      }
+    };
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activated]);
+
+  const reset = useCallback(() => {
+    setActivated(false);
+    index.current = 0;
+  }, []);
+
+  return { activated, reset };
+}

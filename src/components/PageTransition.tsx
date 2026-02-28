@@ -1,1 +1,83 @@
-{"path":"src/components/PageTransition.tsx","content":"import { useRef } from 'react';\nimport { motion, AnimatePresence } from 'framer-motion';\nimport { useLocation } from 'react-router';\nimport { EXPO_OUT } from '@/lib/easing';\nimport { useBatterySaver } from '@/hooks/useBatterySaver';\nimport type { ReactNode } from 'react';\n\ninterface PageTransitionProps {\n  children: ReactNode;\n}\n\nconst variants = {\n  initial: {\n    opacity: 0,\n    scale: 0.97,\n    filter: 'blur(8px)',\n  },\n  enter: {\n    opacity: 1,\n    scale: 1,\n    filter: 'blur(0px)',\n  },\n  exit: {\n    opacity: 0,\n    scale: 1.02,\n    filter: 'blur(4px)',\n  },\n};\n\nconst reducedVariants = {\n  initial: { opacity: 0 },\n  enter: { opacity: 1 },\n  exit: { opacity: 0 },\n};\n\nexport default function PageTransition({ children }: PageTransitionProps) {\n  const location = useLocation();\n  const { isSaving } = useBatterySaver();\n  const wrapperRef = useRef<HTMLDivElement>(null);\n\n  const activeVariants = isSaving ? reducedVariants : variants;\n  const duration = isSaving ? 0.2 : 0.7;\n\n  return (\n    <AnimatePresence mode=\"wait\">\n      <motion.div\n        ref={wrapperRef}\n        key={location.pathname}\n        variants={activeVariants}\n        initial=\"initial\"\n        animate=\"enter\"\n        exit=\"exit\"\n        transition={{\n          duration,\n          ease: EXPO_OUT,\n        }}\n        onAnimationComplete={(definition) => {\n          // After enter animation finishes, clear the inline\n          // transform + filter styles. These create a CSS\n          // \"containing block\" that breaks position:fixed for\n          // descendants (e.g. Mars globe, modals, GSAP pins).\n          if (definition === 'enter' && wrapperRef.current) {\n            wrapperRef.current.style.transform = '';\n            wrapperRef.current.style.filter = '';\n            wrapperRef.current.style.willChange = 'auto';\n\n            // Force GSAP ScrollTrigger to recalculate ALL pin positions.\n            // Dynamic import avoids pulling GSAP into the critical bundle.\n            // By the time enter animation finishes (~700ms), GSAP is already\n            // loaded by page components, so this resolves from module cache.\n            requestAnimationFrame(() => {\n              import('@/lib/gsap').then(({ ScrollTrigger }) => {\n                ScrollTrigger.refresh();\n              });\n            });\n          }\n        }}\n      >\n        {children}\n      </motion.div>\n    </AnimatePresence>\n  );\n}\n","encoding":"utf8"}
+import { useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router';
+import { EXPO_OUT } from '@/lib/easing';
+import { useBatterySaver } from '@/hooks/useBatterySaver';
+import type { ReactNode } from 'react';
+
+interface PageTransitionProps {
+  children: ReactNode;
+}
+
+const variants = {
+  initial: {
+    opacity: 0,
+    scale: 0.97,
+    filter: 'blur(8px)',
+  },
+  enter: {
+    opacity: 1,
+    scale: 1,
+    filter: 'blur(0px)',
+  },
+  exit: {
+    opacity: 0,
+    scale: 1.02,
+    filter: 'blur(4px)',
+  },
+};
+
+const reducedVariants = {
+  initial: { opacity: 0 },
+  enter: { opacity: 1 },
+  exit: { opacity: 0 },
+};
+
+export default function PageTransition({ children }: PageTransitionProps) {
+  const location = useLocation();
+  const { isSaving } = useBatterySaver();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const activeVariants = isSaving ? reducedVariants : variants;
+  const duration = isSaving ? 0.2 : 0.7;
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        ref={wrapperRef}
+        key={location.pathname}
+        variants={activeVariants}
+        initial="initial"
+        animate="enter"
+        exit="exit"
+        transition={{
+          duration,
+          ease: EXPO_OUT,
+        }}
+        onAnimationComplete={(definition) => {
+          // After enter animation finishes, clear the inline
+          // transform + filter styles. These create a CSS
+          // "containing block" that breaks position:fixed for
+          // descendants (e.g. Mars globe, modals, GSAP pins).
+          if (definition === 'enter' && wrapperRef.current) {
+            wrapperRef.current.style.transform = '';
+            wrapperRef.current.style.filter = '';
+            wrapperRef.current.style.willChange = 'auto';
+
+            // Force GSAP ScrollTrigger to recalculate ALL pin positions.
+            // Dynamic import avoids pulling GSAP into the critical bundle.
+            // By the time enter animation finishes (~700ms), GSAP is already
+            // loaded by page components, so this resolves from module cache.
+            requestAnimationFrame(() => {
+              import('@/lib/gsap').then(({ ScrollTrigger }) => {
+                ScrollTrigger.refresh();
+              });
+            });
+          }
+        }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}

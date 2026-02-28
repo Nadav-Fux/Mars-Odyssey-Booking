@@ -1,1 +1,26 @@
-{"path":"src/hooks/useParallax.ts","content":"import { useEffect, useState } from 'react';\n\nexport function useParallax() {\n  const [scrollY, setScrollY] = useState(0);\n\n  useEffect(() => {\n    let ticking = false;\n    const onScroll = () => {\n      if (!ticking) {\n        requestAnimationFrame(() => {\n          setScrollY(window.scrollY);\n          ticking = false;\n        });\n        ticking = true;\n      }\n    };\n    window.addEventListener('scroll', onScroll, { passive: true });\n    return () => window.removeEventListener('scroll', onScroll);\n  }, []);\n\n  const getParallaxStyle = (speed: number = 0.5, offset: number = 0) => ({\n    transform: `translateY(${(scrollY - offset) * speed}px)`,\n  });\n\n  return { scrollY, getParallaxStyle };\n}\n","encoding":"utf8"}
+import { useEffect, useState } from 'react';
+
+export function useParallax() {
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          setScrollY(window.scrollY);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const getParallaxStyle = (speed: number = 0.5, offset: number = 0) => ({
+    transform: `translateY(${(scrollY - offset) * speed}px)`,
+  });
+
+  return { scrollY, getParallaxStyle };
+}
