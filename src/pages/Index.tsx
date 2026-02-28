@@ -1,1 +1,258 @@
-{"path":"src/pages/Index.tsx","content":"import { lazy, Suspense, useEffect } from 'react';\nimport StarField from '@/components/StarField';\nimport VerticalNav from '@/components/VerticalNav';\nimport HeroSection from '@/components/HeroSection';\nimport NebulaBackground from '@/components/NebulaBackground';\nimport LazySection from '@/components/LazySection';\nimport DeferredMount from '@/components/DeferredMount';\nimport Divider from '@/components/Divider';\nimport { useAlertMode } from '@/hooks/useAlertMode';\nimport { useKonamiCode } from '@/hooks/useKonamiCode';\nimport { useAchievements } from '@/hooks/useAchievements';\nimport { useMissionLog } from '@/hooks/useMissionLog';\nimport { useCinemaMode } from '@/hooks/useCinemaMode';\n\n/* ── Deferred HUD controls (not needed at first paint) ── */\nconst CustomCursor = lazy(() => import('@/components/CustomCursor'));\nconst ScanlineOverlay = lazy(() => import('@/components/ScanlineOverlay'));\nconst BatterySaverToggle = lazy(() => import('@/components/BatterySaverToggle'));\nconst LocaleToggle = lazy(() => import('@/components/LocaleToggle'));\nconst DiscoveryToggle = lazy(() => import('@/components/DiscoveryToggle'));\nconst DiscoveryMode = lazy(() => import('@/components/DiscoveryMode'));\nconst LaunchShake = lazy(() => import('@/components/LaunchShake'));\nconst ScrollProgress = lazy(() => import('@/components/ScrollProgress'));\nconst BackToTop = lazy(() => import('@/components/BackToTop'));\nconst TelemetryBar = lazy(() => import('@/components/TelemetryBar'));\nconst CrewChat = lazy(() => import('@/components/CrewChat'));\nconst AchievementPanel = lazy(() => import('@/components/AchievementPanel'));\nconst BoardingPassButton = lazy(() => import('@/components/BoardingPassButton'));\nconst MissionLog = lazy(() => import('@/components/MissionLog'));\nconst MobileActionHub = lazy(() => import('@/components/MobileActionHub'));\nconst MissionComplete = lazy(() => import('@/components/MissionComplete'));\nconst PerformanceDashboard = lazy(() => import('@/components/PerformanceDashboard'));\nconst AsteroidGameModal = lazy(() => import('@/components/AsteroidGameModal'));\n\n/* ── Below-fold sections (lazy-loaded + code-split) ── */\nconst DestinationsSection = lazy(() => import('@/components/DestinationsSection'));\nconst SolarFlythrough = lazy(() => import('@/components/SolarFlythrough'));\nconst ExperienceTimeline = lazy(() => import('@/components/ExperienceTimeline'));\nconst MissionStats = lazy(() => import('@/components/MissionStats'));\nconst ReviewSection = lazy(() => import('@/components/ReviewSection'));\nconst BookingPanel = lazy(() => import('@/components/BookingPanel'));\nconst Footer = lazy(() => import('@/components/Footer'));\nconst FinalTransmission = lazy(() => import('@/components/FinalTransmission'));\nconst ParallaxQuote = lazy(() => import('@/components/ParallaxQuote'));\nconst ExploreCards = lazy(() => import('@/components/ExploreCards'));\nconst MarsGallery = lazy(() => import('@/components/MarsGallery'));\n\n/* ── Deferred overlays (load 500ms after first paint) ── */\nconst AlertOverlay = lazy(() => import('@/components/AlertOverlay'));\nconst SatelliteOverlay = lazy(() => import('@/components/SatelliteOverlay'));\nconst SatelliteToggle = lazy(() => import('@/components/SatelliteToggle'));\nconst DustStorm = lazy(() => import('@/components/DustStorm'));\nconst MarsClock = lazy(() => import('@/components/MarsClock'));\nconst SpaceAudio = lazy(() => import('@/components/SpaceAudio'));\nconst SoundscapeEngine = lazy(() => import('@/components/SoundscapeEngine'));\nconst CommandTerminal = lazy(() => import('@/components/CommandTerminal'));\nconst EmergencyButton = lazy(() => import('@/components/EmergencyButton'));\nconst IncomingTransmission = lazy(() => import('@/components/IncomingTransmission'));\nconst ClassifiedOverlay = lazy(() => import('@/components/ClassifiedOverlay'));\nconst ShipAI = lazy(() => import('@/components/ShipAI'));\nconst CommandPalette = lazy(() => import('@/components/CommandPalette'));\nconst DiscoveryHints = lazy(() => import('@/components/DiscoveryHints'));\n\n/* ── Suspense fallback (invisible — no layout shift) ── */\nconst Blank = <div className="flex items-center justify-center min-h-[200px]"><div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" /></div>;\n\nexport default function Index() {\n  const { alertMode, toggleAlert } = useAlertMode();\n  const { activated: konamiActive, reset: konamiReset } = useKonamiCode();\n  const { unlock } = useAchievements();\n  const { logEvent } = useMissionLog();\n  const { isCinemaMode } = useCinemaMode();\n\n  // Unlock achievement when Konami Code is activated\n  useEffect(() => {\n    if (konamiActive) {\n      unlock('konami');\n      logEvent('Classified data accessed via secure protocol.');\n    }\n  }, [konamiActive, unlock, logEvent]);\n\n  return (\n    <div className=\"relative min-h-screen bg-[#050508] text-white font-sans overflow-x-hidden\">\n\n      {/* ═══ CRITICAL PATH — renders immediately ═══ */}\n      <NebulaBackground />\n      <StarField />\n\n      {/* Ambient glow */}\n      <div className=\"fixed inset-0 pointer-events-none z-[1]\" aria-hidden=\"true\">\n        <div className=\"absolute top-[10%] left-[20%] w-[500px] h-[500px] rounded-full bg-primary/[0.02] blur-[120px]\" />\n        <div className=\"absolute bottom-[30%] right-[15%] w-[400px] h-[400px] rounded-full bg-accent/[0.015] blur-[120px]\" />\n        <div className=\"absolute top-[60%] left-[40%] w-[350px] h-[350px] rounded-full bg-secondary/[0.02] blur-[100px]\" />\n      </div>\n\n      {/* Navigation */}\n      <div\n      className=\"transition-opacity duration-500\"\n      style={{ opacity: isCinemaMode ? 0 : 1, pointerEvents: isCinemaMode ? 'none' : 'auto' }}>\n\n        <VerticalNav />\n      </div>\n\n      {/* ═══ HUD CONTROLS — load after 100ms (not needed at first paint) ═══ */}\n      <div\n      className=\"transition-opacity duration-500\"\n      style={{ opacity: isCinemaMode ? 0 : 1, pointerEvents: isCinemaMode ? 'none' : 'auto' }}>\n\n      <DeferredMount delay={100}>\n        <Suspense fallback={Blank}>\n          <ScrollProgress />\n          <CustomCursor />\n          <ScanlineOverlay />\n          <BatterySaverToggle />\n          <LocaleToggle />\n          <DiscoveryToggle />\n          <DiscoveryMode />\n          <LaunchShake />\n          <BackToTop />\n          <TelemetryBar />\n          <CrewChat />\n          <AchievementPanel />\n          <BoardingPassButton />\n          <MissionLog />\n          <MobileActionHub />\n          <MissionComplete />\n          <PerformanceDashboard />\n          <AsteroidGameModal />\n        </Suspense>\n      </DeferredMount>\n\n      {/* ═══ DEFERRED OVERLAYS — load 500ms after first paint ═══ */}\n      <DeferredMount delay={500}>\n        <Suspense fallback={Blank}>\n          <CommandTerminal />\n          <CommandPalette />\n          <EmergencyButton />\n          <SpaceAudio />\n          <SoundscapeEngine />\n          <AlertOverlay active={alertMode} onToggle={toggleAlert} />\n          <SatelliteOverlay />\n          <SatelliteToggle />\n          <MarsClock />\n        </Suspense>\n      </DeferredMount>\n\n      {/* Even later — dust storm (auto-triggers at ~2min anyway) */}\n      <DeferredMount delay={1500}>\n        <Suspense fallback={Blank}>\n          <DustStorm />\n          <IncomingTransmission />\n          <ShipAI />\n          <DiscoveryHints />\n        </Suspense>\n      </DeferredMount>\n\n      {/* Konami Code Easter Egg */}\n      <Suspense fallback={Blank}>\n        <ClassifiedOverlay open={konamiActive} onClose={konamiReset} />\n      </Suspense>\n      </div>\n\n      {/* ═══ MAIN CONTENT ═══ */}\n      <main className=\"relative pt-14 lg:pt-0\">\n\n        {/* Hero loads eagerly — it's above-the-fold */}\n        <HeroSection />\n\n        <Divider />\n\n        {/* Destinations */}\n        <LazySection id=\"destinations\" minHeight=\"80vh\">\n          <Suspense fallback={Blank}>\n            <DestinationsSection />\n          </Suspense>\n        </LazySection>\n\n        {/* Transition bridge: into flythrough */}\n        <div className=\"relative z-10 h-24 sm:h-36 -mb-1\" style={{ background: 'linear-gradient(to bottom, transparent, #020206)' }} />\n\n        <Suspense fallback={<div style={{ height: '100vh' }} />}>\n          <SolarFlythrough />\n        </Suspense>\n\n        {/* Transition bridge: out of flythrough */}\n        <div className=\"relative z-10 h-24 sm:h-36 -mt-1\" style={{ background: 'linear-gradient(to bottom, #050508, transparent)' }} />\n\n        {/* Experience Timeline */}\n        <LazySection id=\"experience\" minHeight=\"80vh\">\n          <Suspense fallback={Blank}>\n            <ExperienceTimeline />\n          </Suspense>\n        </LazySection>\n\n        {/* Mission Stats */}\n        <LazySection id=\"stats\" minHeight=\"50vh\">\n          <Suspense fallback={Blank}>\n            <MissionStats />\n          </Suspense>\n        </LazySection>\n\n        <Divider />\n\n        {/* Mars Gallery */}\n        <LazySection id=\"gallery\" minHeight=\"60vh\">\n          <Suspense fallback={Blank}>\n            <MarsGallery />\n          </Suspense>\n        </LazySection>\n\n        <Divider />\n\n        {/* ═══ EXPLORE CARDS — gateway to sub-pages (lazy, below fold) ═══ */}\n        <LazySection id=\"explore\" minHeight=\"40vh\">\n          <Suspense fallback={Blank}>\n            <ExploreCards />\n          </Suspense>\n        </LazySection>\n\n        <Divider />\n\n        {/* Reviews */}\n        <LazySection id=\"reviews\" minHeight=\"60vh\">\n          <Suspense fallback={Blank}>\n            <ReviewSection />\n          </Suspense>\n        </LazySection>\n\n        <LazySection id=\"quote\" minHeight=\"30vh\">\n          <Suspense fallback={Blank}>\n            <ParallaxQuote\n              quote=\"I looked and looked but I didn't see God. I saw the thin blue line of atmosphere protecting Earth, and I realized how fragile our home is.\"\n              author=\"YURI GAGARIN\"\n              role=\"FIRST HUMAN IN SPACE · 1961\"\n              accentColor=\"#a855f7\" />\n\n          </Suspense>\n        </LazySection>\n\n        <Suspense fallback={Blank}>\n          <FinalTransmission />\n        </Suspense>\n\n        <LazySection id=\"booking\" minHeight=\"70vh\">\n          <Suspense fallback={Blank}>\n            <BookingPanel />\n          </Suspense>\n        </LazySection>\n      </main>\n\n      <LazySection id=\"footer\" minHeight=\"20vh\">\n        <Suspense fallback={Blank}>\n          <Footer />\n        </Suspense>\n      </LazySection>\n    </div>);\n\n}","encoding":"utf8"}
+import { lazy, Suspense, useEffect } from 'react';
+import StarField from '@/components/StarField';
+import VerticalNav from '@/components/VerticalNav';
+import HeroSection from '@/components/HeroSection';
+import NebulaBackground from '@/components/NebulaBackground';
+import LazySection from '@/components/LazySection';
+import DeferredMount from '@/components/DeferredMount';
+import Divider from '@/components/Divider';
+import { useAlertMode } from '@/hooks/useAlertMode';
+import { useKonamiCode } from '@/hooks/useKonamiCode';
+import { useAchievements } from '@/hooks/useAchievements';
+import { useMissionLog } from '@/hooks/useMissionLog';
+import { useCinemaMode } from '@/hooks/useCinemaMode';
+
+/* ââ Deferred HUD controls (not needed at first paint) ââ */
+const CustomCursor = lazy(() => import('@/components/CustomCursor'));
+const ScanlineOverlay = lazy(() => import('@/components/ScanlineOverlay'));
+const BatterySaverToggle = lazy(() => import('@/components/BatterySaverToggle'));
+const LocaleToggle = lazy(() => import('@/components/LocaleToggle'));
+const DiscoveryToggle = lazy(() => import('@/components/DiscoveryToggle'));
+const DiscoveryMode = lazy(() => import('@/components/DiscoveryMode'));
+const LaunchShake = lazy(() => import('@/components/LaunchShake'));
+const ScrollProgress = lazy(() => import('@/components/ScrollProgress'));
+const BackToTop = lazy(() => import('@/components/BackToTop'));
+const TelemetryBar = lazy(() => import('@/components/TelemetryBar'));
+const CrewChat = lazy(() => import('@/components/CrewChat'));
+const AchievementPanel = lazy(() => import('@/components/AchievementPanel'));
+const BoardingPassButton = lazy(() => import('@/components/BoardingPassButton'));
+const MissionLog = lazy(() => import('@/components/MissionLog'));
+const MobileActionHub = lazy(() => import('@/components/MobileActionHub'));
+const MissionComplete = lazy(() => import('@/components/MissionComplete'));
+const PerformanceDashboard = lazy(() => import('@/components/PerformanceDashboard'));
+const AsteroidGameModal = lazy(() => import('@/components/AsteroidGameModal'));
+
+/* ââ Below-fold sections (lazy-loaded + code-split) ââ */
+const DestinationsSection = lazy(() => import('@/components/DestinationsSection'));
+const SolarFlythrough = lazy(() => import('@/components/SolarFlythrough'));
+const ExperienceTimeline = lazy(() => import('@/components/ExperienceTimeline'));
+const MissionStats = lazy(() => import('@/components/MissionStats'));
+const ReviewSection = lazy(() => import('@/components/ReviewSection'));
+const BookingPanel = lazy(() => import('@/components/BookingPanel'));
+const Footer = lazy(() => import('@/components/Footer'));
+const FinalTransmission = lazy(() => import('@/components/FinalTransmission'));
+const ParallaxQuote = lazy(() => import('@/components/ParallaxQuote'));
+const ExploreCards = lazy(() => import('@/components/ExploreCards'));
+const MarsGallery = lazy(() => import('@/components/MarsGallery'));
+
+/* ââ Deferred overlays (load 500ms after first paint) ââ */
+const AlertOverlay = lazy(() => import('@/components/AlertOverlay'));
+const SatelliteOverlay = lazy(() => import('@/components/SatelliteOverlay'));
+const SatelliteToggle = lazy(() => import('@/components/SatelliteToggle'));
+const DustStorm = lazy(() => import('@/components/DustStorm'));
+const MarsClock = lazy(() => import('@/components/MarsClock'));
+const SpaceAudio = lazy(() => import('@/components/SpaceAudio'));
+const SoundscapeEngine = lazy(() => import('@/components/SoundscapeEngine'));
+const CommandTerminal = lazy(() => import('@/components/CommandTerminal'));
+const EmergencyButton = lazy(() => import('@/components/EmergencyButton'));
+const IncomingTransmission = lazy(() => import('@/components/IncomingTransmission'));
+const ClassifiedOverlay = lazy(() => import('@/components/ClassifiedOverlay'));
+const ShipAI = lazy(() => import('@/components/ShipAI'));
+const CommandPalette = lazy(() => import('@/components/CommandPalette'));
+const DiscoveryHints = lazy(() => import('@/components/DiscoveryHints'));
+
+/* ââ Suspense fallback (invisible â no layout shift) ââ */
+const Blank = <div className="flex items-center justify-center min-h-[200px]"><div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" /></div>;
+
+export default function Index() {
+  const { alertMode, toggleAlert } = useAlertMode();
+  const { activated: konamiActive, reset: konamiReset } = useKonamiCode();
+  const { unlock } = useAchievements();
+  const { logEvent } = useMissionLog();
+  const { isCinemaMode } = useCinemaMode();
+
+  // Unlock achievement when Konami Code is activated
+  useEffect(() => {
+    if (konamiActive) {
+      unlock('konami');
+      logEvent('Classified data accessed via secure protocol.');
+    }
+  }, [konamiActive, unlock, logEvent]);
+
+  return (
+    <div className="relative min-h-screen bg-[#050508] text-white font-sans overflow-x-hidden">
+
+      {/* âââ CRITICAL PATH â renders immediately âââ */}
+      <NebulaBackground />
+      <StarField />
+
+      {/* Ambient glow */}
+      <div className="fixed inset-0 pointer-events-none z-[1]" aria-hidden="true">
+        <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] rounded-full bg-primary/[0.02] blur-[120px]" />
+        <div className="absolute bottom-[30%] right-[15%] w-[400px] h-[400px] rounded-full bg-accent/[0.015] blur-[120px]" />
+        <div className="absolute top-[60%] left-[40%] w-[350px] h-[350px] rounded-full bg-secondary/[0.02] blur-[100px]" />
+      </div>
+
+      {/* Navigation */}
+      <div
+      className="transition-opacity duration-500"
+      style={{ opacity: isCinemaMode ? 0 : 1, pointerEvents: isCinemaMode ? 'none' : 'auto' }}>
+
+        <VerticalNav />
+      </div>
+
+      {/* âââ HUD CONTROLS â load after 100ms (not needed at first paint) âââ */}
+      <div
+      className="transition-opacity duration-500"
+      style={{ opacity: isCinemaMode ? 0 : 1, pointerEvents: isCinemaMode ? 'none' : 'auto' }}>
+
+      <DeferredMount delay={100}>
+        <Suspense fallback={Blank}>
+          <ScrollProgress />
+          <CustomCursor />
+          <ScanlineOverlay />
+          <BatterySaverToggle />
+          <LocaleToggle />
+          <DiscoveryToggle />
+          <DiscoveryMode />
+          <LaunchShake />
+          <BackToTop />
+          <TelemetryBar />
+          <CrewChat />
+          <AchievementPanel />
+          <BoardingPassButton />
+          <MissionLog />
+          <MobileActionHub />
+          <MissionComplete />
+          <PerformanceDashboard />
+          <AsteroidGameModal />
+        </Suspense>
+      </DeferredMount>
+
+      {/* âââ DEFERRED OVERLAYS â load 500ms after first paint âââ */}
+      <DeferredMount delay={500}>
+        <Suspense fallback={Blank}>
+          <CommandTerminal />
+          <CommandPalette />
+          <EmergencyButton />
+          <SpaceAudio />
+          <SoundscapeEngine />
+          <AlertOverlay active={alertMode} onToggle={toggleAlert} />
+          <SatelliteOverlay />
+          <SatelliteToggle />
+          <MarsClock />
+        </Suspense>
+      </DeferredMount>
+
+      {/* Even later â dust storm (auto-triggers at ~2min anyway) */}
+      <DeferredMount delay={1500}>
+        <Suspense fallback={Blank}>
+          <DustStorm />
+          <IncomingTransmission />
+          <ShipAI />
+          <DiscoveryHints />
+        </Suspense>
+      </DeferredMount>
+
+      {/* Konami Code Easter Egg */}
+      <Suspense fallback={Blank}>
+        <ClassifiedOverlay open={konamiActive} onClose={konamiReset} />
+      </Suspense>
+      </div>
+
+      {/* âââ MAIN CONTENT âââ */}
+      <main className="relative pt-14 lg:pt-0">
+
+        {/* Hero loads eagerly â it's above-the-fold */}
+        <HeroSection />
+
+        <Divider />
+
+        {/* Destinations */}
+        <LazySection id="destinations" minHeight="80vh">
+          <Suspense fallback={Blank}>
+            <DestinationsSection />
+          </Suspense>
+        </LazySection>
+
+        {/* Transition bridge: into flythrough */}
+        <div className="relative z-10 h-24 sm:h-36 -mb-1" style={{ background: 'linear-gradient(to bottom, transparent, #020206)' }} />
+
+        <Suspense fallback={<div style={{ height: '100vh' }} />}>
+          <SolarFlythrough />
+        </Suspense>
+
+        {/* Transition bridge: out of flythrough */}
+        <div className="relative z-10 h-24 sm:h-36 -mt-1" style={{ background: 'linear-gradient(to bottom, #050508, transparent)' }} />
+
+        {/* Experience Timeline */}
+        <LazySection id="experience" minHeight="80vh">
+          <Suspense fallback={Blank}>
+            <ExperienceTimeline />
+          </Suspense>
+        </LazySection>
+
+        {/* Mission Stats */}
+        <LazySection id="stats" minHeight="50vh">
+          <Suspense fallback={Blank}>
+            <MissionStats />
+          </Suspense>
+        </LazySection>
+
+        <Divider />
+
+        {/* Mars Gallery */}
+        <LazySection id="gallery" minHeight="60vh">
+          <Suspense fallback={Blank}>
+            <MarsGallery />
+          </Suspense>
+        </LazySection>
+
+        <Divider />
+
+        {/* âââ EXPLORE CARDS â gateway to sub-pages (lazy, below fold) âââ */}
+        <LazySection id="explore" minHeight="40vh">
+          <Suspense fallback={Blank}>
+            <ExploreCards />
+          </Suspense>
+        </LazySection>
+
+        <Divider />
+
+        {/* Reviews */}
+        <LazySection id="reviews" minHeight="60vh">
+          <Suspense fallback={Blank}>
+            <ReviewSection />
+          </Suspense>
+        </LazySection>
+
+        <LazySection id="quote" minHeight="30vh">
+          <Suspense fallback={Blank}>
+            <ParallaxQuote
+              quote="I looked and looked but I didn't see God. I saw the thin blue line of atmosphere protecting Earth, and I realized how fragile our home is."
+              author="YURI GAGARIN"
+              role="FIRST HUMAN IN SPACE Â· 1961"
+              accentColor="#a855f7" />
+
+          </Suspense>
+        </LazySection>
+
+        <Suspense fallback={Blank}>
+          <FinalTransmission />
+        </Suspense>
+
+        <LazySection id="booking" minHeight="70vh">
+          <Suspense fallback={Blank}>
+            <BookingPanel />
+          </Suspense>
+        </LazySection>
+      </main>
+
+      <LazySection id="footer" minHeight="20vh">
+        <Suspense fallback={Blank}>
+          <Footer />
+        </Suspense>
+      </LazySection>
+    </div>);
+
+}","encoding":"utf8
