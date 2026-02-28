@@ -12,7 +12,7 @@ import { useAchievements } from '@/hooks/useAchievements';
 import { useMissionLog } from '@/hooks/useMissionLog';
 import { useCinemaMode } from '@/hooks/useCinemaMode';
 
-/* ââ Deferred HUD controls (not needed at first paint) ââ */
+/* ── Deferred HUD controls (not needed at first paint) ── */
 const CustomCursor = lazy(() => import('@/components/CustomCursor'));
 const ScanlineOverlay = lazy(() => import('@/components/ScanlineOverlay'));
 const BatterySaverToggle = lazy(() => import('@/components/BatterySaverToggle'));
@@ -32,7 +32,7 @@ const MissionComplete = lazy(() => import('@/components/MissionComplete'));
 const PerformanceDashboard = lazy(() => import('@/components/PerformanceDashboard'));
 const AsteroidGameModal = lazy(() => import('@/components/AsteroidGameModal'));
 
-/* ââ Below-fold sections (lazy-loaded + code-split) ââ */
+/* ── Below-fold sections (lazy-loaded + code-split) ── */
 const DestinationsSection = lazy(() => import('@/components/DestinationsSection'));
 const SolarFlythrough = lazy(() => import('@/components/SolarFlythrough'));
 const ExperienceTimeline = lazy(() => import('@/components/ExperienceTimeline'));
@@ -45,7 +45,7 @@ const ParallaxQuote = lazy(() => import('@/components/ParallaxQuote'));
 const ExploreCards = lazy(() => import('@/components/ExploreCards'));
 const MarsGallery = lazy(() => import('@/components/MarsGallery'));
 
-/* ââ Deferred overlays (load 500ms after first paint) ââ */
+/* ── Deferred overlays (load 500ms after first paint) ── */
 const AlertOverlay = lazy(() => import('@/components/AlertOverlay'));
 const SatelliteOverlay = lazy(() => import('@/components/SatelliteOverlay'));
 const SatelliteToggle = lazy(() => import('@/components/SatelliteToggle'));
@@ -61,7 +61,7 @@ const ShipAI = lazy(() => import('@/components/ShipAI'));
 const CommandPalette = lazy(() => import('@/components/CommandPalette'));
 const DiscoveryHints = lazy(() => import('@/components/DiscoveryHints'));
 
-/* ââ Suspense fallback (invisible â no layout shift) ââ */
+/* ── Suspense fallback (invisible — no layout shift) ── */
 const Blank = <div className="flex items-center justify-center min-h-[200px]"><div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" /></div>;
 
 export default function Index() {
@@ -82,7 +82,7 @@ export default function Index() {
   return (
     <div className="relative min-h-screen bg-[#050508] text-white font-sans overflow-x-hidden">
 
-      {/* âââ CRITICAL PATH â renders immediately âââ */}
+      {/* ═══ CRITICAL PATH — renders immediately ═══ */}
       <NebulaBackground />
       <StarField />
 
@@ -101,7 +101,7 @@ export default function Index() {
         <VerticalNav />
       </div>
 
-      {/* âââ HUD CONTROLS â load after 100ms (not needed at first paint) âââ */}
+      {/* ═══ HUD CONTROLS — load after 100ms (not needed at first paint) ═══ */}
       <div
       className="transition-opacity duration-500"
       style={{ opacity: isCinemaMode ? 0 : 1, pointerEvents: isCinemaMode ? 'none' : 'auto' }}>
@@ -129,7 +129,7 @@ export default function Index() {
         </Suspense>
       </DeferredMount>
 
-      {/* âââ DEFERRED OVERLAYS â load 500ms after first paint âââ */}
+      {/* ═══ DEFERRED OVERLAYS — load 500ms after first paint ═══ */}
       <DeferredMount delay={500}>
         <Suspense fallback={Blank}>
           <CommandTerminal />
@@ -144,7 +144,7 @@ export default function Index() {
         </Suspense>
       </DeferredMount>
 
-      {/* Even later â dust storm (auto-triggers at ~2min anyway) */}
+      {/* Even later — dust storm (auto-triggers at ~2min anyway) */}
       <DeferredMount delay={1500}>
         <Suspense fallback={Blank}>
           <DustStorm />
@@ -160,10 +160,10 @@ export default function Index() {
       </Suspense>
       </div>
 
-      {/* âââ MAIN CONTENT âââ */}
+      {/* ═══ MAIN CONTENT ═══ */}
       <main className="relative pt-14 lg:pt-0">
 
-        {/* Hero loads eagerly â it's above-the-fold */}
+        {/* Hero loads eagerly — it's above-the-fold */}
         <HeroSection />
 
         <Divider />
@@ -210,7 +210,7 @@ export default function Index() {
 
         <Divider />
 
-        {/* âââ EXPLORE CARDS â gateway to sub-pages (lazy, below fold) âââ */}
+        {/* ═══ EXPLORE CARDS — gateway to sub-pages (lazy, below fold) ═══ */}
         <LazySection id="explore" minHeight="40vh">
           <Suspense fallback={Blank}>
             <ExploreCards />
@@ -231,7 +231,7 @@ export default function Index() {
             <ParallaxQuote
               quote="I looked and looked but I didn't see God. I saw the thin blue line of atmosphere protecting Earth, and I realized how fragile our home is."
               author="YURI GAGARIN"
-              role="FIRST HUMAN IN SPACE Â· 1961"
+              role="FIRST HUMAN IN SPACE · 1961"
               accentColor="#a855f7" />
 
           </Suspense>
@@ -255,4 +255,4 @@ export default function Index() {
       </LazySection>
     </div>);
 
-}","encoding":"utf8
+}

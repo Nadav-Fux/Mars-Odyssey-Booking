@@ -16,12 +16,12 @@ const BoardingPass = lazy(() => import('@/components/BoardingPass'));
    that expands into a radial menu giving access to features
    normally hidden on small screens:
 
-     ð«  Boarding Pass
-     ð  Mission Log (inline)
-     ð  Achievements (inline)
-     ð»  Terminal
-     ð  Command Palette
-     ð®  Hint: game via terminal
+     🎫  Boarding Pass
+     📜  Mission Log (inline)
+     🏆  Achievements (inline)
+     💻  Terminal
+     🔍  Command Palette
+     🎮  Hint: game via terminal
    ================================================================ */
 
 type Panel = null | 'boarding' | 'log' | 'achievements';
@@ -86,7 +86,7 @@ function MobileActionHub() {
 
   return (
     <>
-      {/* ââ FAB Button ââ */}
+      {/* ── FAB Button ── */}
       <button
       onClick={() => {if (panel) {setPanel(null);} else {setOpen((v) => !v);}}}
       className="fixed bottom-5 right-5 z-[180] lg:hidden w-12 h-12 rounded-full flex items-center justify-center
@@ -116,7 +116,7 @@ function MobileActionHub() {
         </AnimatePresence>
       </button>
 
-      {/* ââ Action Menu (fan-out) ââ */}
+      {/* ── Action Menu (fan-out) ── */}
       <AnimatePresence>
         {open &&
         <>
@@ -160,7 +160,7 @@ function MobileActionHub() {
         }
       </AnimatePresence>
 
-      {/* ââ Inline Panels ââ */}
+      {/* ── Inline Panels ── */}
 
       {/* Boarding Pass */}
       <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" /></div>}>
@@ -200,7 +200,7 @@ function MobileActionHub() {
                     <span className="text-sm leading-none pt-0.5">{e.icon}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-[11px] font-mono text-white/55">{e.text}</div>
-                      <div className="text-[8px] font-display tracking-[0.12em] text-white/18 mt-0.5">SOL {e.sol} Â· MET {e.met}</div>
+                      <div className="text-[8px] font-display tracking-[0.12em] text-white/18 mt-0.5">SOL {e.sol} · MET {e.met}</div>
                     </div>
                   </div>
               )}
@@ -245,7 +245,7 @@ function MobileActionHub() {
                 const earned = unlocked.has(a.id);
                 return (
                   <div key={a.id} className={`flex items-center gap-3 px-4 py-2.5 ${earned ? '' : 'opacity-40'}`}>
-                      <span className="text-lg w-8 text-center">{earned ? a.icon : a.secret ? 'ð' : 'â'}</span>
+                      <span className="text-lg w-8 text-center">{earned ? a.icon : a.secret ? '🔒' : '○'}</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-[11px] font-display tracking-[0.08em] text-white/70">
                           {earned ? a.title : a.secret ? '???' : a.title}
@@ -254,7 +254,7 @@ function MobileActionHub() {
                           {earned ? a.description : a.secret ? 'Secret achievement' : a.description}
                         </div>
                       </div>
-                      {earned && <span className="text-[8px] font-display tracking-[0.15em] text-green-400/50">â</span>}
+                      {earned && <span className="text-[8px] font-display tracking-[0.15em] text-green-400/50">✓</span>}
                     </div>);
 
               })}
@@ -267,4 +267,4 @@ function MobileActionHub() {
 
 }
 
-export default memo(MobileActionHub);","encoding":"utf8
+export default memo(MobileActionHub);

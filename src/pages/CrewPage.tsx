@@ -28,7 +28,7 @@ export default function CrewPage() {
           </h1>
           <p className="mt-4 text-sm sm:text-base text-white/30 max-w-lg mx-auto leading-relaxed">
             Six elite specialists. Thousands of hours of deep-space training. 
-            One shared missionâââto make Mars humanityâs second home.
+            One shared mission — to make Mars humanity’s second home.
           </p>
         </motion.div>
       </section>
@@ -41,4 +41,4 @@ export default function CrewPage() {
       </LazySection>
     </PageShell>);
 
-}","encoding":"utf8
+}

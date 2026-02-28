@@ -16,7 +16,7 @@ import { CinemaModeProvider } from '@/hooks/useCinemaMode';
 import LazyLoadErrorBoundary from '@/components/LazyLoadErrorBoundary';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-/* ââ All pages lazy-loaded for optimal code-splitting ââ */
+/* ── All pages lazy-loaded for optimal code-splitting ── */
 const Index = lazy(() => import('@/pages/Index'));
 const ShipPage = lazy(() => import('@/pages/ShipPage'));
 const CrewPage = lazy(() => import('@/pages/CrewPage'));
@@ -89,7 +89,7 @@ function useTabAway() {
   const { logEvent } = useMissionLog();
 
   usePageTitle(() => {
-    // User returned to tab â log it
+    // User returned to tab — log it
     logEvent('Commander returned to Mission Control.');
   });
 }
@@ -137,4 +137,3 @@ function App() {
 }
 
 export default App;
-","encoding":"utf8

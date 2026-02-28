@@ -13,7 +13,7 @@ const GeologicalScale = lazy(() => import('@/components/GeologicalScale'));
 
 const Blank = <div className="flex items-center justify-center min-h-[200px]"><div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" /></div>;
 
-/* ââ Section divider ââ */
+/* ── Section divider ── */
 function SectionDivider({ label }: {label: string;}) {
   return (
     <div className="relative z-10 py-6 px-4 sm:px-6">
@@ -57,7 +57,7 @@ export default function ExplorePage() {
             transition={{ duration: 0.8, delay: 0.2, ease: EXPO_OUT }}
             className="text-white/30 text-sm sm:text-base max-w-lg leading-relaxed">
 
-            Navigate the Red Planet's most spectacular sites. From the tallest volcano in the solar system to ancient riverbeds hiding signs of life â your expedition starts here.
+            Navigate the Red Planet's most spectacular sites. From the tallest volcano in the solar system to ancient riverbeds hiding signs of life — your expedition starts here.
           </motion.p>
         </div>
       </section>
@@ -117,4 +117,4 @@ export default function ExplorePage() {
       </section>
     </PageShell>);
 
-}","encoding":"utf8
+}

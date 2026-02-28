@@ -31,7 +31,7 @@ export default function ShipPage() {
           </h1>
           <p className="mt-4 text-sm sm:text-base text-white/30 max-w-lg mx-auto leading-relaxed">
             Nuclear thermal propulsion. Magnetic radiation shielding. 
-            360Â° observation dome. Every system engineered for the 7-month journey to Mars.
+            360° observation dome. Every system engineered for the 7-month journey to Mars.
           </p>
         </motion.div>
       </section>
@@ -46,7 +46,7 @@ export default function ShipPage() {
       <ParallaxQuote
         quote="The Earth is the cradle of humanity, but mankind cannot stay in the cradle forever."
         author="KONSTANTIN TSIOLKOVSKY"
-        role="FATHER OF ASTRONAUTICS Â· 1911"
+        role="FATHER OF ASTRONAUTICS · 1911"
         accentColor="#4ab8c4" />
 
 
@@ -65,4 +65,4 @@ export default function ShipPage() {
       </LazySection>
     </PageShell>);
 
-}","encoding":"utf8
+}
